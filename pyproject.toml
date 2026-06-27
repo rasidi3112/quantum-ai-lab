@@ -1,0 +1,102 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantum-ai-lab"
+version = "1.0.0"
+description = "A comprehensive quantum computing and AI research laboratory"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Quantum AI Lab Team"},
+]
+keywords = [
+    "quantum-computing",
+    "quantum-machine-learning",
+    "quantum-algorithms",
+    "quantum-cryptography",
+    "quantum-simulation",
+    "quantum-optimization",
+    "quantum-reinforcement-learning",
+    "quantum-vision",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "matplotlib>=3.7.0",
+]
+
+[project.optional-dependencies]
+quantum = [
+    "pennylane>=0.33.0",
+    "qiskit>=1.0.0",
+]
+ml = [
+    "torch>=2.0.0",
+    "scikit-learn>=1.3.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+all = [
+    "quantum-ai-lab[quantum,ml,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/quantum-ai-lab"
+Repository = "https://github.com/your-org/quantum-ai-lab"
+Documentation = "https://github.com/your-org/quantum-ai-lab/tree/main/docs"
+Issues = "https://github.com/your-org/quantum-ai-lab/issues"
+
+[tool.setuptools.packages.find]
+include = [
+    "quantum_ml*",
+    "quantum_chaos*",
+    "quantum_crypto*",
+    "quantum_algorithms*",
+    "quantum_simulation*",
+    "quantum_optimization*",
+    "quantum_rl*",
+    "quantum_vision*",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "D", "UP"]
+ignore = ["D100", "D104"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
