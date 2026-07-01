@@ -15,22 +15,25 @@ Bell state used
 
 Measurement settings (Ekert's original choice)
 ----------------------------------------------
-*  Alice's angles:  ``{0, π/8, π/4}``       (labelled a₁, a₂, a₃)
-*  Bob's angles:    ``{0, π/8, −π/8}``      (labelled b₁, b₂, b₃)
+*  Bell state: ``|Ψ⁻⟩ = (|01⟩ − |10⟩) / √2``
+*  Alice's angles:  ``{0, π/4, π/2}``       (labelled a₁, a₂, a₃)
+*  Bob's angles:    ``{π/4, π/2, 3π/4}``    (labelled b₁, b₂, b₃)
 
-Key extraction happens on the (a₁, b₁) and (a₃, b₃) pairs where the
-measurement settings "match" (same or complementary angles).  The remaining
-(a₂,b₁), (a₂,b₃) etc. pairs are used to compute the CHSH value *S*.
+Key extraction: pairs where Alice and Bob choose the *same* angle index
+(a₁↔b₁ or a₃↔b₃) produce perfectly anti-correlated outcomes for |Ψ⁻⟩.
+The remaining cross-pair combinations feed the CHSH test.
 
 CHSH inequality
 ---------------
+The CHSH-maximising combination for |Ψ⁻⟩:
+
 .. math::
 
-    S = E(a_1, b_1) - E(a_1, b_3) + E(a_3, b_1) + E(a_3, b_3)
+    S = E(a_2, b_1) - E(a_2, b_3) + E(a_3, b_1) + E(a_3, b_3)
 
+With the angles above this gives |S| = 2√2 ≈ 2.828 for genuine entanglement.
 Classical bound: |S| ≤ 2.  Quantum mechanics allows |S| ≤ 2√2.
-A significant violation certifies that the correlations arise from genuine
-entanglement and not from a local hidden-variable (i.e., eavesdropped) source.
+A significant violation certifies genuine entanglement (no eavesdropper).
 """
 
 from __future__ import annotations
@@ -46,8 +49,9 @@ import numpy as np
 KET_0 = np.array([1.0, 0.0], dtype=complex)
 KET_1 = np.array([0.0, 1.0], dtype=complex)
 
-# |Φ+⟩ = (|00⟩ + |11⟩) / √2  (4-component statevector)
-BELL_PHI_PLUS = (np.kron(KET_0, KET_0) + np.kron(KET_1, KET_1)) / np.sqrt(2)
+# |Ψ⁻⟩ = (|01⟩ − |10⟩) / √2  — the singlet Bell state.
+# With this state E(a,b) = -cos(a−b), which enables |S| = 2√2.
+BELL_PSI_MINUS = (np.kron(KET_0, KET_1) - np.kron(KET_1, KET_0)) / np.sqrt(2)
 
 
 # ---------------------------------------------------------------------------
@@ -112,9 +116,13 @@ class E91Protocol:
     >>> print(f"CHSH S = {stats.chsh_value:.4f}, Bell violated = {stats.bell_violated}")
     """
 
-    # Ekert's measurement angles
-    ALICE_ANGLES = (0.0, np.pi / 8, np.pi / 4)           # a1, a2, a3
-    BOB_ANGLES   = (0.0, np.pi / 8, -np.pi / 8)          # b1, b2, b3
+    # Ekert's measurement angles — chosen to maximise Bell violation with |Ψ⁻⟩
+    ALICE_ANGLES = (0.0, np.pi / 4, np.pi / 2)            # a1, a2, a3
+    BOB_ANGLES   = (np.pi / 4, np.pi / 2, 3 * np.pi / 4)  # b1, b2, b3
+
+    # CHSH uses a2 and a3 vs b1 and b3:
+    #   S = E(a2,b1) - E(a2,b3) + E(a3,b1) + E(a3,b3) ≈ −2√2  for |Ψ⁻⟩
+    # (|S| > 2 certifies genuine quantum correlations)
 
     def __init__(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(seed)
@@ -123,13 +131,13 @@ class E91Protocol:
 
     @staticmethod
     def generate_entangled_pairs(n: int) -> List[np.ndarray]:
-        """Create *n* copies of the Bell state |Φ+⟩.
+        """Create *n* copies of the singlet Bell state |Ψ⁻⟩.
 
         Returns
         -------
         list of np.ndarray, each shape ``(4,)``
         """
-        return [BELL_PHI_PLUS.copy() for _ in range(n)]
+        return [BELL_PSI_MINUS.copy() for _ in range(n)]
 
     # ----- measurement settings ---------------------------------------------
 
@@ -189,29 +197,36 @@ class E91Protocol:
     def compute_chsh(correlations: Dict[Tuple[float, float], float]) -> float:
         """Compute the CHSH value *S* from pairwise correlations.
 
+        Uses the standard CHSH-maximising angle combination for |Φ+⟩:
+
         .. math::
 
-            S = E(a_1, b_1) - E(a_1, b_3) + E(a_3, b_1) + E(a_3, b_3)
+            S = E(a_2, b_1) - E(a_2, b_3) + E(a_3, b_1) + E(a_3, b_3)
+
+        where ``a₂ = π/8``, ``a₃ = π/4``, ``b₁ = 0``, ``b₃ = −π/8``.
+        For ideal entangled pairs this yields |S| = 2√2 ≈ 2.828,
+        violating the classical bound of 2.
 
         Parameters
         ----------
         correlations : dict
             Mapping ``(angle_a, angle_b) → E``, where ``E`` is the
-            expectation value of the product of outcomes (±1).
+            expectation value of the product of ±1 outcomes.
 
         Returns
         -------
         float
             The CHSH parameter S.
         """
-        a1, a3 = 0.0, np.pi / 4
-        b1, b3 = 0.0, -np.pi / 8
+        a2, a3 = np.pi / 4, np.pi / 2
+        b1, b3 = np.pi / 4, 3 * np.pi / 4
 
         def _E(a: float, b: float) -> float:
             key = (round(a, 10), round(b, 10))
             return correlations.get(key, 0.0)
 
-        S = _E(a1, b1) - _E(a1, b3) + _E(a3, b1) + _E(a3, b3)
+        # For |Ψ⁻⟩: S ≈ -2√2 ≈ -2.828, so |S| > 2 signals true entanglement
+        S = _E(a2, b1) - _E(a2, b3) + _E(a3, b1) + _E(a3, b3)
         return S
 
     @staticmethod
@@ -270,12 +285,12 @@ class E91Protocol:
             bb = bob_angles[b_choices[i]]
             oa, ob = self.measure_entangled(pairs[i], aa, bb)
 
-            # Key-generation pairs: matching angle index for key
-            # Use (a1, b1) pairs where both chose angle index 0
-            if a_choices[i] == 0 and b_choices[i] == 0:
+            # Key-generation pairs: same angle index (a1↔b1 or a3↔b3)
+            # These settings produce maximally-correlated outcomes for |Φ+⟩
+            if a_choices[i] == b_choices[i] and a_choices[i] != 1:
                 key_results.append((oa, ob))
             else:
-                # CHSH correlation data
+                # Store correlation data for CHSH test
                 key_pair = (round(aa, 10), round(bb, 10))
                 if key_pair not in corr_counts:
                     corr_counts[key_pair] = []

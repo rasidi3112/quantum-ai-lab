@@ -88,36 +88,41 @@ pip install -e .
 ### Quick Start
 
 ```python
-# Generate a quantum-secure key with BB84
+# 🔐 Generate a quantum-secure key with BB84
 from quantum_crypto import BB84Protocol
 
 bb84 = BB84Protocol()
-result = bb84.run_protocol(n_qubits=1000)
-print(f"Shared key length: {len(result['shared_key'])} bits")
-print(f"QBER: {result['error_rate']:.4f}")
+key, stats = bb84.run_protocol(n_qubits=1000)
+print(f"Shared key length: {stats.final_key_length} bits")
+print(f"QBER: {stats.qber:.4f}")
+print(f"Protocol secure: {stats.protocol_secure}")
 
-# Factor a number with Shor's Algorithm
+# ⚙️ Factor a number with Shor's Algorithm
 from quantum_algorithms import ShorFactoring
 
 shor = ShorFactoring()
-factors = shor.factor(15)
-print(f"15 = {factors[0]} × {factors[1]}")
+result = shor.factor(15)
+p, q = result.factors
+print(f"15 = {p} × {q}  (success={result.success})")
 
-# Train a Quantum Neural Network
+# 🤖 Train a Variational Quantum Classifier
 from quantum_ml import VariationalClassifier
+import numpy as np
 
-clf = VariationalClassifier(n_qubits=4, n_layers=2)
-clf.train(X_train, y_train, epochs=100, lr=0.1)
-predictions = clf.predict(X_test)
+X_train = np.random.rand(20, 2) * np.pi
+y_train = (X_train[:, 0] > np.pi / 2).astype(int)
+clf = VariationalClassifier(n_qubits=2, n_layers=2, random_state=42)
+clf.train(X_train, y_train, epochs=50, verbose=False)
+print(f"Train accuracy: {clf.accuracy(X_train, y_train):.1%}")
 
-# Simulate an Ising Model Phase Transition
+# 🧲 Simulate an Ising Model Phase Transition
 from quantum_simulation import IsingModel
 
 ising = IsingModel(n_sites=6, J=1.0, h=0.5)
-E0, psi0 = ising.ground_state()
-mag = ising.magnetization(psi0)
+E0, psi0 = IsingModel.ground_state(ising.hamiltonian)
+mag_profile = IsingModel.magnetization(psi0, ising.n_sites)
 print(f"Ground state energy: {E0:.4f}")
-print(f"Magnetization: {mag:.4f}")
+print(f"Avg magnetization:   {mag_profile.mean():.4f}")
 ```
 
 ## Architecture
