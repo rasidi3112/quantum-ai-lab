@@ -98,7 +98,6 @@ class QuantumKernel:
             3. For each pair (i,j): exp(i(π - xᵢ)(π - xⱼ) ZᵢZⱼ)  (entangling)
         """
         n = self.n_qubits
-        # Start with identity
         U = np.eye(self.dim, dtype=complex)
 
         for _ in range(self.n_layers):

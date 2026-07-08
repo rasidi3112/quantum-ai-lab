@@ -1,0 +1,39 @@
+name: Daily Quantum README Update
+
+on:
+  schedule:
+    # Runs at 00:00 UTC (07:00 WIB) every day
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Crucial permission to allow git push
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run update script
+        run: python .github/scripts/update_readme.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Check if README.md has changed
+          if ! git diff --quiet README.md; then
+            git add README.md
+            git commit -m "docs: auto-update quantum stats [skip ci]"
+            git push origin HEAD:${{ github.ref }}
+          else
+            echo "No changes in README.md"
+          fi

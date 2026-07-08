@@ -7,33 +7,38 @@ secret key.  Its security relies on Bell's theorem: any eavesdropper who
 disturbs the entanglement will reduce the observed CHSH correlation below the
 quantum-mechanical maximum of ``2√2 ≈ 2.828``, alerting Alice and Bob.
 
-Bell state used
----------------
+Bell state
+----------
 .. math::
 
-    |\\Phi^+\\rangle = \\frac{1}{\\sqrt{2}} (|00\\rangle + |11\\rangle)
+    |\\Psi^-\\rangle = \\frac{1}{\\sqrt{2}} (|01\\rangle - |10\\rangle)
 
-Measurement settings (Ekert's original choice)
-----------------------------------------------
-*  Bell state: ``|Ψ⁻⟩ = (|01⟩ − |10⟩) / √2``
-*  Alice's angles:  ``{0, π/4, π/2}``       (labelled a₁, a₂, a₃)
-*  Bob's angles:    ``{π/4, π/2, 3π/4}``    (labelled b₁, b₂, b₃)
+Measurement settings — 5-angle protocol
+---------------------------------------
+*  Bell state:     ``|Ψ⁻⟩ = (|01⟩ − |10⟩) / √2``  (singlet)
+*  Alice's angles: ``{π/2, 0, 3π/8}``   (a₁, a₂, a_k)
+*  Bob's angles:   ``{π/4, −π/4, 3π/8}``  (b₁, b₂, b_k)
 
-Key extraction: pairs where Alice and Bob choose the *same* angle index
-(a₁↔b₁ or a₃↔b₃) produce perfectly anti-correlated outcomes for |Ψ⁻⟩.
-The remaining cross-pair combinations feed the CHSH test.
+The angle sets are chosen so that key-generation pairs and CHSH pairs
+are **completely disjoint**:
+
+* **Key pair** (index 2 for both): Alice=3π/8, Bob=3π/8.
+  For |Ψ⁻⟩, ``E(θ, θ) = −1`` (perfect anti-correlation).
+  Bob flips his bit → 100 % key agreement.
+* **CHSH pairs** (Alice index 0 or 1, Bob index 0 or 1):
+  The four combinations ``{π/2, 0} × {π/4, −π/4}`` feed the CHSH test.
+* **Wasted pairs**: the remaining four cross-index combinations
+  are discarded (~44 % of all pairs).
 
 CHSH inequality
 ---------------
-The CHSH-maximising combination for |Ψ⁻⟩:
-
 .. math::
 
-    S = E(a_2, b_1) - E(a_2, b_3) + E(a_3, b_1) + E(a_3, b_3)
+    S = E(a_1, b_1) - E(a_1, b_2) + E(a_2, b_1) + E(a_2, b_2)
 
-With the angles above this gives |S| = 2√2 ≈ 2.828 for genuine entanglement.
-Classical bound: |S| ≤ 2.  Quantum mechanics allows |S| ≤ 2√2.
-A significant violation certifies genuine entanglement (no eavesdropper).
+where ``a₁=π/2``, ``a₂=0``, ``b₁=π/4``, ``b₂=−π/4``.
+For |Ψ⁻⟩ this evaluates to ``S = −2√2 ≈ −2.828``
+(the quantum-mechanical maximum), certifying genuine entanglement.
 """
 
 from __future__ import annotations
@@ -116,13 +121,20 @@ class E91Protocol:
     >>> print(f"CHSH S = {stats.chsh_value:.4f}, Bell violated = {stats.bell_violated}")
     """
 
-    # Ekert's measurement angles — chosen to maximise Bell violation with |Ψ⁻⟩
-    ALICE_ANGLES = (0.0, np.pi / 4, np.pi / 2)            # a1, a2, a3
-    BOB_ANGLES   = (np.pi / 4, np.pi / 2, 3 * np.pi / 4)  # b1, b2, b3
-
-    # CHSH uses a2 and a3 vs b1 and b3:
-    #   S = E(a2,b1) - E(a2,b3) + E(a3,b1) + E(a3,b3) ≈ −2√2  for |Ψ⁻⟩
-    # (|S| > 2 certifies genuine quantum correlations)
+    # 5-angle protocol angle sets
+    # ----------------------------
+    # Index 0 and 1 are CHSH angles; index 2 is the dedicated key angle.
+    #
+    #   Alice:  a1=π/2 (idx 0)  a2=0 (idx 1)  a_k=3π/8 (idx 2)
+    #   Bob:    b1=π/4 (idx 0)  b2=−π/4 (idx 1)  b_k=3π/8 (idx 2)
+    #
+    # Key pair:  Alice idx 2 AND Bob idx 2  (both measure at 3π/8)
+    #            E(3π/8, 3π/8) = −1  → perfect anti-correlation → Bob flips
+    # CHSH:      Alice idx ∈ {0,1} AND Bob idx ∈ {0,1}
+    #            S = E(π/2,π/4)−E(π/2,−π/4)+E(0,π/4)+E(0,−π/4) = −2√2
+    # Wasted:    all remaining cross-index pairs (~44 % of total)
+    ALICE_ANGLES = (np.pi / 2, 0.0,           3 * np.pi / 8)  # a1, a2, a_k
+    BOB_ANGLES   = (np.pi / 4, -np.pi / 4,    3 * np.pi / 8)  # b1, b2, b_k
 
     def __init__(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(seed)
@@ -195,17 +207,25 @@ class E91Protocol:
 
     @staticmethod
     def compute_chsh(correlations: Dict[Tuple[float, float], float]) -> float:
-        """Compute the CHSH value *S* from pairwise correlations.
+        """Compute the CHSH parameter *S* using the optimal 4-angle configuration.
 
-        Uses the standard CHSH-maximising angle combination for |Φ+⟩:
+        For the 5-angle protocol with |Ψ⁻⟩ and
+        ``Alice={π/2, 0, 3π/8}``, ``Bob={π/4, −π/4, 3π/8}``:
 
         .. math::
 
-            S = E(a_2, b_1) - E(a_2, b_3) + E(a_3, b_1) + E(a_3, b_3)
+            S = E(a_1, b_1) - E(a_1, b_2) + E(a_2, b_1) + E(a_2, b_2)
 
-        where ``a₂ = π/8``, ``a₃ = π/4``, ``b₁ = 0``, ``b₃ = −π/8``.
-        For ideal entangled pairs this yields |S| = 2√2 ≈ 2.828,
-        violating the classical bound of 2.
+        where ``a₁=π/2``, ``a₂=0``, ``b₁=π/4``, ``b₂=−π/4``.
+
+        Each correlation ``E(a,b) = −cos(a−b)`` for |Ψ⁻⟩, giving:
+
+        * ``E(π/2, π/4)  = −cos(π/4) = −1/√2``
+        * ``E(π/2, −π/4) = −cos(3π/4) = +1/√2``
+        * ``E(0,   π/4)  = −cos(−π/4) = −1/√2``
+        * ``E(0,   −π/4) = −cos(π/4)  = −1/√2``
+
+        ``S = (−1/√2) − (+1/√2) + (−1/√2) + (−1/√2) = −2√2 ≈ −2.828``
 
         Parameters
         ----------
@@ -216,17 +236,17 @@ class E91Protocol:
         Returns
         -------
         float
-            The CHSH parameter S.
+            The CHSH parameter S.  Ideal value: ``−2√2 ≈ −2.828``.
         """
-        a2, a3 = np.pi / 4, np.pi / 2
-        b1, b3 = np.pi / 4, 3 * np.pi / 4
+        # CHSH angles — disjoint from the key angle (3π/8)
+        a1, a2 = np.pi / 2, 0.0
+        b1, b2 = np.pi / 4, -np.pi / 4
 
         def _E(a: float, b: float) -> float:
-            key = (round(a, 10), round(b, 10))
-            return correlations.get(key, 0.0)
+            k = (round(a, 10), round(b, 10))
+            return correlations.get(k, 0.0)
 
-        # For |Ψ⁻⟩: S ≈ -2√2 ≈ -2.828, so |S| > 2 signals true entanglement
-        S = _E(a2, b1) - _E(a2, b3) + _E(a3, b1) + _E(a3, b3)
+        S = _E(a1, b1) - _E(a1, b2) + _E(a2, b1) + _E(a2, b2)
         return S
 
     @staticmethod
@@ -285,18 +305,23 @@ class E91Protocol:
             bb = bob_angles[b_choices[i]]
             oa, ob = self.measure_entangled(pairs[i], aa, bb)
 
-            # Key-generation pairs: same angle index (a1↔b1 or a3↔b3)
-            # These settings produce maximally-correlated outcomes for |Φ+⟩
-            if a_choices[i] == b_choices[i] and a_choices[i] != 1:
-                key_results.append((oa, ob))
-            else:
-                # Store correlation data for CHSH test
-                key_pair = (round(aa, 10), round(bb, 10))
-                if key_pair not in corr_counts:
-                    corr_counts[key_pair] = []
-                # Product of ±1 outcomes: map 0→+1, 1→−1
-                product = (1 - 2 * oa) * (1 - 2 * ob)
-                corr_counts[key_pair].append(product)
+            # ----------------------------------------------------------------
+            # Route each pair to its role:
+            #   KEY   — both chose index 2 (angle 3π/8): E=−1, perfect
+            #            anticorrelation → Bob flips bit to agree with Alice.
+            #   CHSH  — Alice idx ∈ {0,1} AND Bob idx ∈ {0,1}: the four
+            #            combinations that feed the CHSH inequality test.
+            #   WASTED — all remaining cross-index pairs: discarded.
+            # ----------------------------------------------------------------
+            ai, bi = int(a_choices[i]), int(b_choices[i])
+            if ai == 2 and bi == 2:                 # key pair
+                key_results.append((oa, 1 - ob))   # Bob flips to agree
+            elif ai in (0, 1) and bi in (0, 1):    # CHSH pair
+                k = (round(aa, 10), round(bb, 10))
+                if k not in corr_counts:
+                    corr_counts[k] = []
+                corr_counts[k].append((1 - 2 * oa) * (1 - 2 * ob))
+            # else: wasted pair — silently dropped
 
         # Compute correlations
         correlations_raw: Dict[Tuple[float, float], float] = {}

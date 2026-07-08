@@ -78,10 +78,7 @@ class KickedTop:
         self.p = p
         self.dim = int(2 * j + 1)
 
-        # Build angular momentum operators
         self.Jx, self.Jy, self.Jz = self._build_angular_momentum()
-
-        # Build the Floquet operator
         self._floquet = self._build_floquet_operator()
 
     # ------------------------------------------------------------------

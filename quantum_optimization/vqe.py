@@ -36,10 +36,12 @@ from scipy.optimize import minimize
 
 _I2 = np.eye(2, dtype=np.complex128)
 
+
 def _ry(theta: float) -> NDArray[np.complex128]:
     """Single-qubit RY(θ) rotation."""
     c, s = np.cos(theta / 2), np.sin(theta / 2)
     return np.array([[c, -s], [s, c]], dtype=np.complex128)
+
 
 def _rz(theta: float) -> NDArray[np.complex128]:
     """Single-qubit RZ(θ) rotation."""
@@ -49,10 +51,12 @@ def _rz(theta: float) -> NDArray[np.complex128]:
         dtype=np.complex128,
     )
 
+
 def _rx(theta: float) -> NDArray[np.complex128]:
     """Single-qubit RX(θ) rotation."""
     c, s = np.cos(theta / 2), np.sin(theta / 2)
     return np.array([[c, -1j * s], [-1j * s, c]], dtype=np.complex128)
+
 
 def _cnot_matrix(n_qubits: int, control: int, target: int) -> NDArray[np.complex128]:
     """Full CNOT matrix on *n_qubits* with given control and target."""
@@ -66,11 +70,13 @@ def _cnot_matrix(n_qubits: int, control: int, target: int) -> NDArray[np.complex
         U[new_basis, basis] = 1.0
     return U
 
+
 def _kron_chain(*ops: NDArray[np.complex128]) -> NDArray[np.complex128]:
     out = ops[0]
     for op in ops[1:]:
         out = np.kron(out, op)
     return out
+
 
 def _apply_single_qubit(
     gate: NDArray[np.complex128],

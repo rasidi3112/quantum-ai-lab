@@ -88,7 +88,7 @@ pip install -e .
 ### Quick Start
 
 ```python
-# 🔐 Generate a quantum-secure key with BB84
+# Generate a quantum-secure key with BB84
 from quantum_crypto import BB84Protocol
 
 bb84 = BB84Protocol()
@@ -97,15 +97,15 @@ print(f"Shared key length: {stats.final_key_length} bits")
 print(f"QBER: {stats.qber:.4f}")
 print(f"Protocol secure: {stats.protocol_secure}")
 
-# ⚙️ Factor a number with Shor's Algorithm
+# Factor a number with Shor's Algorithm
 from quantum_algorithms import ShorFactoring
 
 shor = ShorFactoring()
 result = shor.factor(15)
 p, q = result.factors
-print(f"15 = {p} × {q}  (success={result.success})")
+print(f"15 = {p} x {q}  (success={result.success})")
 
-# 🤖 Train a Variational Quantum Classifier
+# Train a Variational Quantum Classifier
 from quantum_ml import VariationalClassifier
 import numpy as np
 
@@ -115,7 +115,7 @@ clf = VariationalClassifier(n_qubits=2, n_layers=2, random_state=42)
 clf.train(X_train, y_train, epochs=50, verbose=False)
 print(f"Train accuracy: {clf.accuracy(X_train, y_train):.1%}")
 
-# 🧲 Simulate an Ising Model Phase Transition
+# Simulate an Ising Model Phase Transition
 from quantum_simulation import IsingModel
 
 ising = IsingModel(n_sites=6, J=1.0, h=0.5)
@@ -291,11 +291,11 @@ This repository implements quantum algorithms from first principles. Key mathema
 | **Visualization** | Matplotlib | Plots, diagrams, quantum state visualization |
 | **Quantum (Optional)** | PennyLane / Qiskit | Real quantum hardware backends |
 
-##  License
+## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
-##  References
+## References
 
 1. Nielsen, M. A., & Chuang, I. L. (2010). *Quantum Computation and Quantum Information*. Cambridge University Press.
 2. Schuld, M., & Petruccione, F. (2021). *Machine Learning with Quantum Computers*. Springer.
@@ -317,8 +317,6 @@ This repository is currently under active development. Features and APIs are sub
 ---
 
 <div align="center">
-
-**Built with love for the quantum computing community**
 
 *Quantum AI Laboratory — Exploring the frontiers of quantum intelligence*
 

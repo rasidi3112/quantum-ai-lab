@@ -76,7 +76,6 @@ class QuantumPolicy:
         self.dim = 2 ** n_qubits
         self._rng = np.random.default_rng(seed)
 
-        # Pre-compute gate matrices
         self._I = np.eye(2, dtype=np.complex128)
         self._X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
         self._CNOT = np.array([
