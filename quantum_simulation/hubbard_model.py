@@ -37,10 +37,6 @@ from numpy.typing import NDArray
 from scipy import linalg as la
 
 
-# ======================================================================
-# Single-qubit operators
-# ======================================================================
-
 _I2 = np.eye(2, dtype=np.complex128)
 _X  = np.array([[0, 1], [1, 0]], dtype=np.complex128)
 _Y  = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
@@ -54,10 +50,6 @@ def _kron_chain(*ops: NDArray[np.complex128]) -> NDArray[np.complex128]:
         out = np.kron(out, op)
     return out
 
-
-# ======================================================================
-# Jordan-Wigner helpers
-# ======================================================================
 
 def _jordan_wigner_creation(site: int, n_modes: int) -> NDArray[np.complex128]:
     r"""Build the creation operator :math:`c^\dagger_j` on *n_modes* qubits.
@@ -80,13 +72,12 @@ def _jordan_wigner_creation(site: int, n_modes: int) -> NDArray[np.complex128]:
     -------
     ndarray, shape (2^n_modes, 2^n_modes)
     """
-    # (X - iY) / 2  =  |0><1|  =  σ_+ (raising operator)
     sigma_plus = (_X - 1j * _Y) / 2.0
 
     ops: list[NDArray[np.complex128]] = []
     for k in range(n_modes):
         if k < site:
-            ops.append(_Z)       # Jordan-Wigner string
+            ops.append(_Z)
         elif k == site:
             ops.append(sigma_plus)
         else:
@@ -140,21 +131,14 @@ class HubbardModel:
         self.t_hop = t_hop
         self.U = U
         self.periodic = periodic
-        self.n_modes = 2 * n_sites          # total fermionic modes (qubits)
-        self.dim = 2 ** self.n_modes        # Hilbert-space dimension
+        self.n_modes = 2 * n_sites
+        self.dim = 2 ** self.n_modes
         self._hamiltonian: Optional[NDArray[np.complex128]] = None
-
-    # ------------------------------------------------------------------
-    # Mode-index helpers
-    # ------------------------------------------------------------------
 
     def _mode(self, site: int, spin: int) -> int:
         """Return qubit index for (site, spin).  spin: 0=↑, 1=↓."""
         return site * 2 + spin
 
-    # ------------------------------------------------------------------
-    # Hamiltonian construction
-    # ------------------------------------------------------------------
 
     @staticmethod
     def build_hamiltonian(
@@ -193,20 +177,18 @@ class HubbardModel:
         def mode(site: int, spin: int) -> int:
             return site * 2 + spin
 
-        # Hopping term  -t Σ (c†_iσ c_jσ + h.c.)
         n_bonds = n_sites if periodic else n_sites - 1
         for bond in range(n_bonds):
             site_i = bond
             site_j = (bond + 1) % n_sites
-            for spin in (0, 1):                 # ↑ and ↓
+            for spin in (0, 1):
                 mi = mode(site_i, spin)
                 mj = mode(site_j, spin)
                 c_dag_i = _jordan_wigner_creation(mi, n_modes)
                 c_j     = _jordan_wigner_annihilation(mj, n_modes)
                 hop = c_dag_i @ c_j
-                H -= t_hop * (hop + hop.conj().T)   # + h.c.
+                H -= t_hop * (hop + hop.conj().T)
 
-        # On-site interaction  U Σ n_i↑ n_i↓
         for site in range(n_sites):
             n_up   = _number_operator(mode(site, 0), n_modes)
             n_down = _number_operator(mode(site, 1), n_modes)
@@ -223,10 +205,6 @@ class HubbardModel:
             )
         return self._hamiltonian
 
-    # ------------------------------------------------------------------
-    # Ground state
-    # ------------------------------------------------------------------
-
     @staticmethod
     def ground_state_energy(
         H: NDArray[np.complex128],
@@ -240,10 +218,6 @@ class HubbardModel:
         """
         eigenvalues, eigenvectors = la.eigh(H)
         return float(eigenvalues[0]), eigenvectors[:, 0]
-
-    # ------------------------------------------------------------------
-    # Observables
-    # ------------------------------------------------------------------
 
     def density_profile(
         self,
@@ -288,10 +262,6 @@ class HubbardModel:
             n_down = _number_operator(self._mode(site, 1), self.n_modes)
             docc[site] = np.real(state.conj() @ (n_up @ n_down) @ state)
         return docc
-
-    # ------------------------------------------------------------------
-    # Spectral function
-    # ------------------------------------------------------------------
 
     def spectral_function(
         self,
@@ -345,25 +315,17 @@ class HubbardModel:
 
         A = np.zeros_like(omega_range, dtype=np.float64)
 
-        # Particle part  ⟨m|c†|0⟩
         c_dag_psi0 = c_dag @ psi0
-        # Hole part  ⟨m|c|0⟩
         c_psi0 = c @ psi0
 
         for m, Em in enumerate(eigenvalues):
-            # Particle contribution
             weight_p = np.abs(eigenvectors[:, m].conj() @ c_dag_psi0) ** 2
             A += (1.0 / np.pi) * eta / ((omega_range - (Em - E0)) ** 2 + eta ** 2) * weight_p
 
-            # Hole contribution
             weight_h = np.abs(eigenvectors[:, m].conj() @ c_psi0) ** 2
             A += (1.0 / np.pi) * eta / ((omega_range + (Em - E0)) ** 2 + eta ** 2) * weight_h
 
         return A
-
-    # ------------------------------------------------------------------
-    # Convenience
-    # ------------------------------------------------------------------
 
     def get_ground_state(self) -> Tuple[float, NDArray[np.complex128]]:
         """Ground-state energy & vector for *this* instance."""

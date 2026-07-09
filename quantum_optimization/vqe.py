@@ -30,10 +30,6 @@ from scipy import linalg as la
 from scipy.optimize import minimize
 
 
-# ======================================================================
-# Gate primitives (dense matrices)
-# ======================================================================
-
 _I2 = np.eye(2, dtype=np.complex128)
 
 
@@ -89,10 +85,6 @@ def _apply_single_qubit(
     return _kron_chain(*ops)
 
 
-# ======================================================================
-# VQE class
-# ======================================================================
-
 class VQE:
     """Variational Quantum Eigensolver.
 
@@ -110,9 +102,6 @@ class VQE:
         self.optimal_energy: Optional[float] = None
         self.optimal_state: Optional[NDArray[np.complex128]] = None
 
-    # ----------------------------------------------------------------
-    # Ansätze
-    # ----------------------------------------------------------------
 
     @staticmethod
     def hardware_efficient_ansatz(
@@ -140,11 +129,10 @@ class VQE:
         """
         dim = 2 ** n_qubits
         psi = np.zeros(dim, dtype=np.complex128)
-        psi[0] = 1.0  # |00…0⟩
+        psi[0] = 1.0
 
         idx = 0
         for layer in range(n_layers):
-            # Single-qubit rotations
             for q in range(n_qubits):
                 U_ry = _apply_single_qubit(_ry(params[idx]), q, n_qubits)
                 psi = U_ry @ psi
@@ -153,7 +141,6 @@ class VQE:
                 psi = U_rz @ psi
                 idx += 1
 
-            # CNOT ladder
             for q in range(n_qubits - 1):
                 U_cx = _cnot_matrix(n_qubits, q, q + 1)
                 psi = U_cx @ psi
@@ -188,7 +175,6 @@ class VQE:
         """
         dim = 2 ** n_qubits
 
-        # Hartree-Fock reference: first n_electrons qubits in |1⟩
         hf_index = 0
         for q in range(n_electrons):
             hf_index |= (1 << (n_qubits - 1 - q))
@@ -198,17 +184,14 @@ class VQE:
         n_occ = n_electrons
         n_virt = n_qubits - n_electrons
 
-        # Build generator T - T†
         T = np.zeros((dim, dim), dtype=np.complex128)
 
         idx = 0
 
-        # Single excitations  |occ⟩ → |virt⟩
         for i in range(n_occ):
             for a in range(n_occ, n_qubits):
                 if idx >= len(params):
                     break
-                # Simple excitation operator |a⟩⟨i|  (in computational basis)
                 for basis in range(dim):
                     bits = list(format(basis, f"0{n_qubits}b"))
                     if bits[i] == '1' and bits[a] == '0':
@@ -219,7 +202,6 @@ class VQE:
                         T[new_basis, basis] += params[idx]
                 idx += 1
 
-        # Double excitations  |occ_i, occ_j⟩ → |virt_a, virt_b⟩
         for i in range(n_occ):
             for j in range(i + 1, n_occ):
                 for a in range(n_occ, n_qubits):
@@ -239,15 +221,11 @@ class VQE:
                                 T[new_basis, basis] += params[idx]
                         idx += 1
 
-        # Anti-Hermitian generator
         generator = T - T.conj().T
         U = la.expm(generator)
         psi = U @ psi
         return psi
 
-    # ----------------------------------------------------------------
-    # Energy evaluation
-    # ----------------------------------------------------------------
 
     @staticmethod
     def energy_evaluation(
@@ -277,9 +255,6 @@ class VQE:
         psi = ansatz_fn(*ansatz_args, params)
         return float(np.real(psi.conj() @ hamiltonian @ psi))
 
-    # ----------------------------------------------------------------
-    # Optimisation
-    # ----------------------------------------------------------------
 
     def optimize(
         self,
@@ -324,7 +299,7 @@ class VQE:
             n_singles = n_occ * n_virt
             n_doubles = (n_occ * (n_occ - 1) // 2) * (n_virt * (n_virt - 1) // 2)
             n_params = n_singles + n_doubles
-            ansatz_fn = self.uccsd_ansatz  # type: ignore[assignment]
+            ansatz_fn = self.uccsd_ansatz
             ansatz_args = (self.n_qubits, n_electrons)
         else:
             raise ValueError(f"Unknown ansatz: {ansatz}")
@@ -355,9 +330,6 @@ class VQE:
             "result": result,
         }
 
-    # ----------------------------------------------------------------
-    # Parameter landscape
-    # ----------------------------------------------------------------
 
     def parameter_landscape(
         self,
@@ -393,7 +365,7 @@ class VQE:
             ansatz_fn = self.hardware_efficient_ansatz
             ansatz_args: tuple = (self.n_qubits, n_layers)
         else:
-            ansatz_fn = self.uccsd_ansatz  # type: ignore[assignment]
+            ansatz_fn = self.uccsd_ansatz
             ansatz_args = (self.n_qubits, n_electrons)
 
         energies = np.zeros(len(param_range))

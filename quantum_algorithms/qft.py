@@ -62,7 +62,6 @@ class QFT:
     >>> print(np.abs(transformed)**2)   # uniform distribution
     """
 
-    # ----- QFT matrix -------------------------------------------------------
 
     @staticmethod
     def qft_matrix(n_qubits: int) -> np.ndarray:
@@ -86,7 +85,6 @@ class QFT:
         indices = np.arange(N)
         return np.power(omega, np.outer(indices, indices)) / np.sqrt(N)
 
-    # ----- Inverse QFT matrix -----------------------------------------------
 
     @staticmethod
     def iqft_matrix(n_qubits: int) -> np.ndarray:
@@ -107,7 +105,6 @@ class QFT:
         indices = np.arange(N)
         return np.power(omega, np.outer(indices, indices)) / np.sqrt(N)
 
-    # ----- apply to state ---------------------------------------------------
 
     def apply_qft(self, state: np.ndarray) -> np.ndarray:
         """Apply the QFT to a statevector.
@@ -143,7 +140,6 @@ class QFT:
         F_inv = self.iqft_matrix(n)
         return F_inv @ state
 
-    # ----- gate decomposition -----------------------------------------------
 
     @staticmethod
     def qft_single_qubit_gates(n_qubits: int
@@ -170,13 +166,11 @@ class QFT:
                 angle = 2 * np.pi / (2 ** (j - i + 1))
                 gates.append(("CP", j, i, angle))
 
-        # Bit-reversal swaps
         for i in range(n_qubits // 2):
             gates.append(("SWAP", i, n_qubits - 1 - i))
 
         return gates
 
-    # ----- build gate matrices from decomposition ---------------------------
 
     @staticmethod
     def _hadamard() -> np.ndarray:
@@ -214,7 +208,6 @@ class QFT:
         for gate in self.qft_single_qubit_gates(n_qubits):
             if gate[0] == "H":
                 qubit = gate[1]
-                # Embed single-qubit gate into full space
                 gate_matrix = np.array([[1]], dtype=complex)
                 for q in range(n_qubits):
                     gate_matrix = np.kron(
@@ -236,7 +229,6 @@ class QFT:
                     t = int("".join(bits), 2)
                     swap[t, s] = 1.0
                     swap[s, s] = 0.0 if t != s else swap[s, s]
-                # Build proper SWAP matrix
                 swap = np.zeros((N, N), dtype=complex)
                 for s in range(N):
                     bits = list(format(s, f"0{n_qubits}b"))
@@ -247,7 +239,6 @@ class QFT:
 
         return U
 
-    # ----- phase estimation -------------------------------------------------
 
     def phase_estimation(self, unitary: np.ndarray,
                          eigenstate: np.ndarray,
@@ -289,42 +280,30 @@ class QFT:
         t = n_precision
         Q = 2 ** t
 
-        # Full system: (counting register) ⊗ (eigenstate register)
-        # Dimension = Q * M
         full_dim = Q * M
 
-        # Step 1–2: |+⟩^⊗t ⊗ |u⟩
         state = np.zeros(full_dim, dtype=complex)
         for j in range(Q):
             for m in range(M):
                 state[j * M + m] = eigenstate[m] / np.sqrt(Q)
 
-        # Step 3: Controlled-U^{2^k}
-        # For each counting qubit k, if that qubit is |1⟩, apply U^{2^k}
-        # to the eigenstate register.
         for k in range(t):
             U_power = np.linalg.matrix_power(unitary, 2 ** k)
             new_state = np.zeros_like(state)
             for j in range(Q):
-                # Check if bit k of j is set
                 if (j >> k) & 1:
-                    # Apply U^{2^k} to eigenstate part
                     eigen_part = state[j * M:(j + 1) * M]
                     new_state[j * M:(j + 1) * M] = U_power @ eigen_part
                 else:
                     new_state[j * M:(j + 1) * M] = state[j * M:(j + 1) * M]
             state = new_state
 
-        # Step 4: inverse QFT on counting register
         iqft = self.iqft_matrix(t)
 
-        # Reshape state as (Q, M), apply iQFT on first axis
         state_matrix = state.reshape(Q, M)
         state_matrix = iqft @ state_matrix
         state = state_matrix.flatten()
 
-        # Step 5: Measure counting register
-        # Probability of each counting register outcome (trace out eigenstate)
         probs = np.zeros(Q)
         for j in range(Q):
             probs[j] = np.sum(np.abs(state[j * M:(j + 1) * M]) ** 2)

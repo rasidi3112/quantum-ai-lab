@@ -66,9 +66,6 @@ class LyapunovEstimator:
     def __init__(self) -> None:
         pass
 
-    # ------------------------------------------------------------------
-    # Time evolution
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _time_evolve_operator(
@@ -130,14 +127,10 @@ class LyapunovEstimator:
         phases = np.exp(1j * eigenvalues * t)
         phases_neg = np.exp(-1j * eigenvalues * t)
 
-        # O(t) = V diag(e^{iEt}) V† O V diag(e^{-iEt}) V†
-        O_energy = V_dag @ O @ V  # O in energy basis
+        O_energy = V_dag @ O @ V
         O_evolved_energy = np.outer(phases, phases_neg) * O_energy
         return V @ O_evolved_energy @ V_dag
 
-    # ------------------------------------------------------------------
-    # OTOC computation
-    # ------------------------------------------------------------------
 
     def compute_otoc(
         self,
@@ -171,22 +164,17 @@ class LyapunovEstimator:
         """
         N = H.shape[0]
 
-        # Pre-diagonalize H for efficiency
         eigenvalues, eigenvectors = np.linalg.eigh(H)
 
         otoc = np.zeros(len(times))
 
         for idx, t in enumerate(times):
-            # Evolve W: W(t) = e^{iHt} W e^{-iHt}
             W_t = self._time_evolve_operator_eig(
                 eigenvalues, eigenvectors, W, t
             )
 
-            # Commutator: [W(t), V]
             comm = W_t @ V - V @ W_t
 
-            # C(t) = (1/N) Tr(comm† comm)  (positive-definite version)
-            # This equals -Tr([W(t),V]^2)/N when W,V are Hermitian
             otoc[idx] = np.real(np.trace(comm.conj().T @ comm)) / N
 
         return otoc
@@ -231,38 +219,28 @@ class LyapunovEstimator:
         """
         N = H.shape[0]
 
-        # Compute thermal state
         eigenvalues, eigenvectors = np.linalg.eigh(H)
 
-        # Shift eigenvalues for numerical stability
         E_shifted = eigenvalues - np.min(eigenvalues)
         boltzmann = np.exp(-beta * E_shifted)
-        Z = np.sum(boltzmann)  # Partition function
+        Z = np.sum(boltzmann)
 
-        # Density matrix in energy basis
         rho_diag = boltzmann / Z
 
         otoc = np.zeros(len(times))
 
         for idx, t in enumerate(times):
-            # Evolve W(t)
             W_t = self._time_evolve_operator_eig(
                 eigenvalues, eigenvectors, W, t
             )
 
-            # Commutator [W(t), V]
             comm = W_t @ V - V @ W_t
 
-            # Thermal average: Tr(ρ · comm† · comm)
-            # In energy basis: Σ_n ρ_n ⟨n|comm†·comm|n⟩
             comm_energy = eigenvectors.conj().T @ (comm.conj().T @ comm) @ eigenvectors
             otoc[idx] = np.real(np.sum(rho_diag * np.diag(comm_energy)))
 
         return otoc
 
-    # ------------------------------------------------------------------
-    # Lyapunov exponent extraction
-    # ------------------------------------------------------------------
 
     @staticmethod
     def estimate_lyapunov(
@@ -298,7 +276,6 @@ class LyapunovEstimator:
             'fit_values': fitted C(t) values,
             'r_squared': R² goodness of fit.
         """
-        # Filter positive OTOC values for log fit
         mask = otoc_values > 0
         t_pos = times[mask]
         c_pos = otoc_values[mask]
@@ -314,7 +291,6 @@ class LyapunovEstimator:
 
         c_max = np.max(c_pos)
 
-        # Auto-detect fitting window
         if t_start is None:
             idx_start_candidates = np.where(c_pos > 0.01 * c_max)[0]
             if len(idx_start_candidates) > 0:
@@ -329,32 +305,27 @@ class LyapunovEstimator:
             else:
                 t_end = t_pos[-1]
 
-        # Select fitting window
         fit_mask = (t_pos >= t_start) & (t_pos <= t_end)
         t_fit = t_pos[fit_mask]
         c_fit = c_pos[fit_mask]
 
         if len(c_fit) < 3:
-            # Not enough points; use all positive data
             t_fit = t_pos
             c_fit = c_pos
 
-        # Log-space linear fit: log(C) = log(A) + 2λt
         log_c = np.log(c_fit)
         coeffs = np.polyfit(t_fit, log_c, 1)
-        slope = coeffs[0]  # = 2λ
-        intercept = coeffs[1]  # = log(A)
+        slope = coeffs[0]
+        intercept = coeffs[1]
 
         lyapunov = slope / 2.0
         amplitude = np.exp(intercept)
 
-        # R² for goodness of fit
         log_c_pred = np.polyval(coeffs, t_fit)
         ss_res = np.sum((log_c - log_c_pred) ** 2)
         ss_tot = np.sum((log_c - np.mean(log_c)) ** 2)
         r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
 
-        # Predicted values for plotting
         fit_values = amplitude * np.exp(2 * lyapunov * t_fit)
 
         return {
@@ -365,9 +336,6 @@ class LyapunovEstimator:
             "r_squared": float(r_squared),
         }
 
-    # ------------------------------------------------------------------
-    # Scrambling time
-    # ------------------------------------------------------------------
 
     @staticmethod
     def scrambling_time(

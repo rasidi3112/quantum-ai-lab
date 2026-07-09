@@ -61,9 +61,6 @@ class QuantumEncoder:
     def __init__(self, n_qubits: Optional[int] = None):
         self.n_qubits = n_qubits
 
-    # ------------------------------------------------------------------ #
-    #  Amplitude Encoding                                                 #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def amplitude_encoding(image: np.ndarray) -> np.ndarray:
@@ -95,23 +92,18 @@ class QuantumEncoder:
         flat = image.flatten().astype(np.float64)
         n_pixels = len(flat)
 
-        # Pad to nearest power of 2
         n_qubits = int(np.ceil(np.log2(max(n_pixels, 2))))
         dim = 2 ** n_qubits
 
         state = np.zeros(dim, dtype=np.complex128)
         state[:n_pixels] = flat
 
-        # Normalize
         norm = np.linalg.norm(state)
         if norm > 1e-15:
             state /= norm
 
         return state
 
-    # ------------------------------------------------------------------ #
-    #  Angle Encoding                                                     #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def angle_encoding(image: np.ndarray, n_qubits: Optional[int] = None) -> np.ndarray:
@@ -145,11 +137,9 @@ class QuantumEncoder:
 
         dim = 2 ** n_qubits
 
-        # Start from |0...0⟩
         state = np.zeros(dim, dtype=np.complex128)
         state[0] = 1.0
 
-        # Apply RY(arctan(x_i)) to each qubit
         psi = state.reshape([2] * n_qubits)
 
         for i in range(min(len(flat), n_qubits)):
@@ -162,9 +152,6 @@ class QuantumEncoder:
 
         return psi.reshape(dim)
 
-    # ------------------------------------------------------------------ #
-    #  Threshold (Binary) Encoding                                        #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def threshold_encoding(
@@ -194,12 +181,9 @@ class QuantumEncoder:
         n_qubits = int(np.ceil(np.log2(max(n_pixels, 2))))
         dim = 2 ** n_qubits
 
-        # Compute basis state index from binary encoding
         bits = (flat > threshold).astype(int)
-        # Pad to n_qubits
         bits = np.pad(bits, (0, max(0, n_qubits - len(bits))))[:n_qubits]
 
-        # Convert binary to index
         index = 0
         for b in bits:
             index = (index << 1) | b
@@ -208,9 +192,6 @@ class QuantumEncoder:
         state[index] = 1.0
         return state
 
-    # ------------------------------------------------------------------ #
-    #  FRQI — Flexible Representation of Quantum Images                   #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def FRQI(image: np.ndarray) -> np.ndarray:
@@ -240,44 +221,32 @@ class QuantumEncoder:
         qubits encode the pixel position.
         """
         flat = image.flatten().astype(np.float64)
-        # Normalize to [0, 1] if needed
         if flat.max() > 1.0:
             flat = flat / 255.0
         flat = np.clip(flat, 0, 1)
 
         n_pixels = len(flat)
 
-        # Pad to power of 2
         n_pos_qubits = int(np.ceil(np.log2(max(n_pixels, 2))))
         N = 2 ** n_pos_qubits
         pixels = np.zeros(N)
         pixels[:n_pixels] = flat
 
-        # Total qubits: 1 (color) + n_pos_qubits (position)
         n_total_qubits = 1 + n_pos_qubits
         dim = 2 ** n_total_qubits
 
-        # Build FRQI state
-        # |I⟩ = (1/√N) Σᵢ (cos θᵢ |0⟩ + sin θᵢ |1⟩) ⊗ |i⟩
-        # In the full state vector, basis state index = color_bit * N + position
         state = np.zeros(dim, dtype=np.complex128)
 
         thetas = (np.pi / 2) * pixels
 
         for i in range(N):
-            # |0⟩⊗|i⟩ → index = 0 * N + i = i
             state[i] += np.cos(thetas[i])
-            # |1⟩⊗|i⟩ → index = 1 * N + i = N + i
             state[N + i] += np.sin(thetas[i])
 
-        # Normalize
         state /= np.sqrt(N)
 
         return state
 
-    # ------------------------------------------------------------------ #
-    #  NEQR — Novel Enhanced Quantum Representation                       #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def NEQR(image: np.ndarray, n_gray_bits: int = 8) -> np.ndarray:
@@ -318,19 +287,15 @@ class QuantumEncoder:
         n_pos_qubits = int(np.ceil(np.log2(max(n_pixels, 2))))
         N = 2 ** n_pos_qubits
 
-        # Quantize to integer gray levels
         max_gray = 2 ** n_gray_bits - 1
         gray_levels = np.zeros(N, dtype=int)
         gray_levels[:n_pixels] = np.round(flat * max_gray).astype(int)
 
-        # Total qubits: n_gray_bits + n_pos_qubits
         n_total = n_gray_bits + n_pos_qubits
         dim = 2 ** n_total
 
         state = np.zeros(dim, dtype=np.complex128)
 
-        # |I⟩ = (1/√N) Σᵢ |gᵢ⟩ ⊗ |i⟩
-        # Index = gray_value * N + position
         G = 2 ** n_gray_bits
         for i in range(N):
             g = gray_levels[i]
@@ -338,16 +303,12 @@ class QuantumEncoder:
             if idx < dim:
                 state[idx] = 1.0
 
-        # Normalize
         norm = np.linalg.norm(state)
         if norm > 1e-15:
             state /= norm
 
         return state
 
-    # ------------------------------------------------------------------ #
-    #  Decoding                                                           #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def decode_amplitude(
@@ -380,16 +341,12 @@ class QuantumEncoder:
         n_pixels = int(np.prod(original_shape))
         amplitudes = np.real(state[:n_pixels])
 
-        # Un-normalize: find the scale factor
         norm = np.linalg.norm(amplitudes)
         if norm > 1e-15:
             amplitudes = amplitudes / norm
 
         return amplitudes.reshape(original_shape)
 
-    # ------------------------------------------------------------------ #
-    #  Utilities                                                          #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def compression_ratio(original_size: int, n_qubits: int) -> float:
@@ -437,18 +394,14 @@ class QuantumEncoder:
         """
         flat = image.flatten()
         n_pixels = len(flat)
-        classical_bits = 8 * n_pixels  # assuming 8-bit pixels
+        classical_bits = 8 * n_pixels
 
-        # Amplitude encoding
         amp_qubits = int(np.ceil(np.log2(max(n_pixels, 2))))
 
-        # Angle encoding
         angle_qubits = n_pixels
 
-        # FRQI
         frqi_qubits = int(np.ceil(np.log2(max(n_pixels, 2)))) + 1
 
-        # NEQR (8-bit gray)
         neqr_qubits = int(np.ceil(np.log2(max(n_pixels, 2)))) + 8
 
         return {

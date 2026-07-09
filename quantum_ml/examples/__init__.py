@@ -24,14 +24,12 @@ def load_iris_binary():
     Returns setosa (class 0) vs. versicolor (class 1) with 2 features
     (sepal length, sepal width) for efficiency.
     """
-    # Iris setosa samples (sepal_length, sepal_width)
     setosa = np.array([
         [5.1, 3.5], [4.9, 3.0], [4.7, 3.2], [4.6, 3.1], [5.0, 3.6],
         [5.4, 3.9], [4.6, 3.4], [5.0, 3.4], [4.4, 2.9], [4.9, 3.1],
         [5.4, 3.7], [4.8, 3.4], [4.8, 3.0], [4.3, 3.0], [5.8, 4.0],
     ])
 
-    # Iris versicolor samples (sepal_length, sepal_width)
     versicolor = np.array([
         [7.0, 3.2], [6.4, 3.2], [6.9, 3.1], [5.5, 2.3], [6.5, 2.8],
         [5.7, 2.8], [6.3, 3.3], [4.9, 2.4], [6.6, 2.9], [5.2, 2.7],
@@ -41,7 +39,6 @@ def load_iris_binary():
     X = np.vstack([setosa, versicolor])
     y = np.array([0] * len(setosa) + [1] * len(versicolor))
 
-    # Normalize features to [0, π]
     X_min = X.min(axis=0)
     X_max = X.max(axis=0)
     X_norm = (X - X_min) / (X_max - X_min) * np.pi
@@ -54,7 +51,6 @@ def main():
     print("  Quantum ML — Iris Classification Demo")
     print("=" * 60)
 
-    # Load data
     X, y = load_iris_binary()
     n_train = 20
     X_train, X_test = X[:n_train], X[n_train:]
@@ -64,7 +60,6 @@ def main():
     print(f"Features: 2 (sepal length, sepal width)")
     print(f"Classes: setosa (0) vs versicolor (1)")
 
-    # --- Quantum Kernel Classification ---
     print("\n" + "-" * 60)
     print("  1. Quantum Kernel Classification")
     print("-" * 60)
@@ -83,7 +78,6 @@ def main():
     acc = np.mean(np.sign(preds) == y_svm_test)
     print(f"\nQuantum Kernel SVM Accuracy: {acc:.1%}")
 
-    # --- Variational Quantum Classifier ---
     print("\n" + "-" * 60)
     print("  2. Variational Quantum Classifier")
     print("-" * 60)
@@ -100,7 +94,6 @@ def main():
     print(f"    Final loss:     {result['loss']:.6f}")
     print(f"    Iterations:     {result['n_iterations']}")
 
-    # Print predictions
     print(f"\n  Test Predictions:")
     preds = clf.predict(X_test)
     for i, (pred, true) in enumerate(zip(preds, y_test)):

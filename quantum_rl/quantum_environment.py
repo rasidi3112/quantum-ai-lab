@@ -72,25 +72,21 @@ class CartPoleEnv:
         self.max_steps = max_steps
         self._rng = np.random.default_rng(seed)
 
-        # Physics constants
         self.gravity = 9.8
         self.mass_cart = 1.0
         self.mass_pole = 0.1
         self.total_mass = self.mass_cart + self.mass_pole
         self.pole_half_length = 0.5
         self.force_mag = 10.0
-        self.dt = 0.02  # Euler integration timestep
+        self.dt = 0.02
 
-        # Termination thresholds
-        self.theta_threshold = 12 * np.pi / 180  # 12 degrees
+        self.theta_threshold = 12 * np.pi / 180
         self.x_threshold = 2.4
 
-        # Env metadata
         self.n_actions = 2
         self.obs_dim = 4
         self.name = "CartPole-v0"
 
-        # State
         self.state: Optional[np.ndarray] = None
         self.steps: int = 0
 
@@ -137,17 +133,11 @@ class CartPoleEnv:
 
         x, x_dot, theta, theta_dot = self.state
 
-        # Applied force
         force = self.force_mag if action == 1 else -self.force_mag
 
-        # Physics: equations of motion for cart-pole system
         cos_theta = np.cos(theta)
         sin_theta = np.sin(theta)
 
-        # Acceleration of the pole angular velocity
-        # From Lagrangian mechanics:
-        #   θ̈ = (g·sin(θ) + cos(θ)·(-F - m_p·l·θ̇²·sin(θ)) / m_total)
-        #        / (l · (4/3 - m_p·cos²(θ) / m_total))
         temp = (
             force + self.mass_pole * self.pole_half_length * theta_dot ** 2 * sin_theta
         ) / self.total_mass
@@ -159,7 +149,6 @@ class CartPoleEnv:
 
         x_acc = temp - self.mass_pole * self.pole_half_length * theta_acc * cos_theta / self.total_mass
 
-        # Euler integration
         x = x + self.dt * x_dot
         x_dot = x_dot + self.dt * x_acc
         theta = theta + self.dt * theta_dot
@@ -168,7 +157,6 @@ class CartPoleEnv:
         self.state = np.array([x, x_dot, theta, theta_dot])
         self.steps += 1
 
-        # Check termination
         done = bool(
             abs(x) > self.x_threshold
             or abs(theta) > self.theta_threshold
@@ -202,7 +190,6 @@ class CartPoleEnv:
         cart_pos = int((x / self.x_threshold + 1) * width / 2)
         cart_pos = max(2, min(width - 3, cart_pos))
 
-        # Pole direction
         if abs(theta) < 0.05:
             pole_char = "|"
         elif theta > 0:
@@ -213,19 +200,16 @@ class CartPoleEnv:
         lines = []
         lines.append("=" * (width + 2))
 
-        # Pole line
         pole_line = [" "] * (width + 2)
         pole_line[cart_pos + 1] = pole_char
         lines.append("".join(pole_line))
 
-        # Cart line
         cart_line = [" "] * (width + 2)
         cart_line[cart_pos] = "["
         cart_line[cart_pos + 1] = "█"
         cart_line[cart_pos + 2] = "]"
         lines.append("".join(cart_line))
 
-        # Track
         lines.append("-" * (width + 2))
         lines.append(
             f" x={x:+.2f}  θ={np.degrees(theta):+.1f}°  step={self.steps}"
@@ -286,7 +270,6 @@ class FrozenLakeEnv:
         "HFFG",
     ]
 
-    # Action names for rendering
     ACTION_NAMES = {0: "UP", 1: "RIGHT", 2: "DOWN", 3: "LEFT"}
     ACTION_ARROWS = {0: "↑", 1: "→", 2: "↓", 3: "←"}
 
@@ -305,14 +288,12 @@ class FrozenLakeEnv:
         self.nrow = len(self.grid_map)
         self.ncol = len(self.grid_map[0])
 
-        # Env metadata
         self.n_actions = 4
         self.n_states = self.nrow * self.ncol
-        self.obs_dim = self.n_states  # one-hot encoding
+        self.obs_dim = self.n_states
 
         self.name = "FrozenLake-v0"
 
-        # Find start position
         self.start_pos = None
         for r, row in enumerate(self.grid_map):
             for c, cell in enumerate(row):
@@ -321,7 +302,6 @@ class FrozenLakeEnv:
         if self.start_pos is None:
             self.start_pos = (0, 0)
 
-        # State
         self.agent_pos: Optional[Tuple[int, int]] = None
         self.steps: int = 0
 
@@ -340,13 +320,13 @@ class FrozenLakeEnv:
     def _move(self, pos: Tuple[int, int], action: int) -> Tuple[int, int]:
         """Compute new position after taking action."""
         r, c = pos
-        if action == 0:    # Up
+        if action == 0:
             r = max(0, r - 1)
-        elif action == 1:  # Right
+        elif action == 1:
             c = min(self.ncol - 1, c + 1)
-        elif action == 2:  # Down
+        elif action == 2:
             r = min(self.nrow - 1, r + 1)
-        elif action == 3:  # Left
+        elif action == 3:
             c = max(0, c - 1)
         return (r, c)
 
@@ -392,23 +372,20 @@ class FrozenLakeEnv:
         if self.agent_pos is None:
             raise RuntimeError("Call reset() before step()")
 
-        # Slippery: with 1/3 probability each, move intended or ±90°
         if self.is_slippery:
             rand = self._rng.random()
             if rand < 1 / 3:
                 actual_action = action
             elif rand < 2 / 3:
-                actual_action = (action + 1) % 4  # Perpendicular right
+                actual_action = (action + 1) % 4
             else:
-                actual_action = (action - 1) % 4  # Perpendicular left
+                actual_action = (action - 1) % 4
         else:
             actual_action = action
 
-        # Move
         self.agent_pos = self._move(self.agent_pos, actual_action)
         self.steps += 1
 
-        # Check cell type
         cell = self._get_cell(self.agent_pos)
 
         if cell == "H":

@@ -70,7 +70,6 @@ class QuantumOTP:
     def __init__(self, seed: Optional[int] = None) -> None:
         self.seed = seed
 
-    # ----- text ↔ binary ---------------------------------------------------
 
     @staticmethod
     def encode_message(text: str) -> np.ndarray:
@@ -115,7 +114,6 @@ class QuantumOTP:
             chars.append(chr(value))
         return "".join(chars)
 
-    # ----- XOR encryption / decryption --------------------------------------
 
     @staticmethod
     def encrypt(message_bits: np.ndarray,
@@ -162,7 +160,6 @@ class QuantumOTP:
         """
         return np.bitwise_xor(ciphertext, quantum_key[:len(ciphertext)])
 
-    # ----- full pipeline ----------------------------------------------------
 
     def secure_communicate(self, message: str,
                            protocol: str = "bb84"
@@ -189,20 +186,15 @@ class QuantumOTP:
         message_bits = self.encode_message(message)
         needed = len(message_bits)
 
-        # Generate enough key material
-        # We request more qubits than needed because sifting + privacy amp
-        # reduce the usable key length.
         if protocol.lower() == "bb84":
             qkd = BB84Protocol(seed=self.seed)
-            # Need roughly 8× qubits after sifting + amplification
             n_qubits = max(needed * 10, 512)
             key, stats = qkd.run_protocol(n_qubits, eve_present=False)
 
-            # If key is too short, run again with more qubits
             attempts = 0
             while len(key) < needed and attempts < 5:
                 n_qubits *= 2
-                qkd = BB84Protocol(seed=None)  # fresh randomness
+                qkd = BB84Protocol(seed=None)
                 key, stats = qkd.run_protocol(n_qubits, eve_present=False)
                 attempts += 1
 
@@ -244,7 +236,6 @@ class QuantumOTP:
                 )
             )
 
-        # Encrypt → transmit → decrypt
         ciphertext = self.encrypt(message_bits, key)
         decrypted_bits = self.decrypt(ciphertext, key)
         decrypted_text = self.decode_message(decrypted_bits)

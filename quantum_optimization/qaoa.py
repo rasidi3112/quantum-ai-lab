@@ -32,10 +32,6 @@ from scipy import linalg as la
 from scipy.optimize import minimize
 
 
-# ======================================================================
-# Pauli building blocks
-# ======================================================================
-
 _I2 = np.eye(2, dtype=np.complex128)
 _X  = np.array([[0, 1], [1, 0]], dtype=np.complex128)
 _Z  = np.array([[1, 0], [0, -1]], dtype=np.complex128)
@@ -47,10 +43,6 @@ def _kron_chain(*ops: NDArray[np.complex128]) -> NDArray[np.complex128]:
         out = np.kron(out, op)
     return out
 
-
-# ======================================================================
-# QAOA class
-# ======================================================================
 
 class QAOA:
     """Quantum Approximate Optimization Algorithm.
@@ -73,9 +65,6 @@ class QAOA:
         self.optimal_state: Optional[NDArray[np.complex128]] = None
         self.optimal_energy: Optional[float] = None
 
-    # ----------------------------------------------------------------
-    # Hamiltonian builders
-    # ----------------------------------------------------------------
 
     @staticmethod
     def cost_hamiltonian(
@@ -140,9 +129,6 @@ class QAOA:
             B += _kron_chain(*ops)
         return B
 
-    # ----------------------------------------------------------------
-    # Circuit
-    # ----------------------------------------------------------------
 
     @staticmethod
     def qaoa_circuit(
@@ -172,23 +158,17 @@ class QAOA:
             Final state vector.
         """
         n = cost_H.shape[0]
-        # |+>^n
         psi = np.ones(n, dtype=np.complex128) / np.sqrt(n)
 
         p = len(gamma)
         for l in range(p):
-            # Cost unitary
             U_C = la.expm(-1j * gamma[l] * cost_H)
             psi = U_C @ psi
-            # Mixer unitary
             U_B = la.expm(-1j * beta[l] * mixer_H)
             psi = U_B @ psi
 
         return psi
 
-    # ----------------------------------------------------------------
-    # Expectation value
-    # ----------------------------------------------------------------
 
     @staticmethod
     def expectation_value(
@@ -198,9 +178,6 @@ class QAOA:
         """Compute ⟨ψ|H|ψ⟩."""
         return float(np.real(state.conj() @ hamiltonian @ state))
 
-    # ----------------------------------------------------------------
-    # Optimisation
-    # ----------------------------------------------------------------
 
     def optimize(
         self,
@@ -245,7 +222,7 @@ class QAOA:
             gamma = params[:p_layers]
             beta  = params[p_layers:]
             psi = self.qaoa_circuit(gamma, beta, cost_H, mixer_H)
-            return -self.expectation_value(psi, cost_H)  # minimise ↔ maximise cut
+            return -self.expectation_value(psi, cost_H)
 
         result = minimize(objective, initial_params, method=method,
                           options={"maxiter": maxiter})
@@ -266,9 +243,6 @@ class QAOA:
             "result": result,
         }
 
-    # ----------------------------------------------------------------
-    # Sampling
-    # ----------------------------------------------------------------
 
     @staticmethod
     def sample_solution(
@@ -291,7 +265,7 @@ class QAOA:
         """
         n_qubits = int(np.log2(len(state)))
         probs = np.abs(state) ** 2
-        probs /= probs.sum()  # numerical safety
+        probs /= probs.sum()
 
         indices = np.random.choice(len(state), size=n_samples, p=probs)
         counts: Dict[str, int] = {}
@@ -300,9 +274,6 @@ class QAOA:
             counts[bs] = counts.get(bs, 0) + 1
         return dict(sorted(counts.items(), key=lambda x: -x[1]))
 
-    # ----------------------------------------------------------------
-    # Energy landscape
-    # ----------------------------------------------------------------
 
     @staticmethod
     def energy_landscape(

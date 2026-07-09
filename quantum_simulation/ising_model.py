@@ -35,20 +35,13 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy import linalg as la
 
-# ---------------------------------------------------------------------------
-# Pauli matrices and identity  (2 × 2, complex128)
-# ---------------------------------------------------------------------------
 
-#: Pauli-X (bit-flip) matrix
 sigma_x: NDArray[np.complex128] = np.array([[0, 1], [1, 0]], dtype=np.complex128)
 
-#: Pauli-Y matrix
 sigma_y: NDArray[np.complex128] = np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
 
-#: Pauli-Z (phase-flip) matrix
 sigma_z: NDArray[np.complex128] = np.array([[1, 0], [0, -1]], dtype=np.complex128)
 
-#: 2 × 2 identity
 identity: NDArray[np.complex128] = np.eye(2, dtype=np.complex128)
 
 
@@ -106,9 +99,6 @@ class IsingModel:
         self.dim = 2 ** n_sites
         self._hamiltonian: Optional[NDArray[np.complex128]] = None
 
-    # ------------------------------------------------------------------
-    # Hamiltonian construction
-    # ------------------------------------------------------------------
 
     @staticmethod
     def build_hamiltonian(
@@ -141,18 +131,15 @@ class IsingModel:
         dim = 2 ** n_sites
         H = np.zeros((dim, dim), dtype=np.complex128)
 
-        # --- ZZ interaction terms ---
         n_bonds = n_sites if periodic else n_sites - 1
         for bond in range(n_bonds):
             i = bond
             j = (bond + 1) % n_sites
-            # Build σ_z^{(i)} ⊗ σ_z^{(j)} acting on the full Hilbert space
             ops = [identity] * n_sites
             ops[i] = sigma_z
             ops[j] = sigma_z
             H -= J * tensor_product(*ops)
 
-        # --- Transverse field terms ---
         for i in range(n_sites):
             ops = [identity] * n_sites
             ops[i] = sigma_x
@@ -169,9 +156,6 @@ class IsingModel:
             )
         return self._hamiltonian
 
-    # ------------------------------------------------------------------
-    # Ground state & spectrum
-    # ------------------------------------------------------------------
 
     @staticmethod
     def ground_state(
@@ -216,9 +200,6 @@ class IsingModel:
         eigenvalues = la.eigh(H, eigvals_only=True)
         return eigenvalues[: min(n_states, len(eigenvalues))]
 
-    # ------------------------------------------------------------------
-    # Observables
-    # ------------------------------------------------------------------
 
     @staticmethod
     def magnetization(
@@ -276,9 +257,6 @@ class IsingModel:
         ZZ = tensor_product(*ops)
         return float(np.real(state.conj() @ ZZ @ state))
 
-    # ------------------------------------------------------------------
-    # Phase diagram
-    # ------------------------------------------------------------------
 
     @staticmethod
     def phase_diagram(
@@ -316,9 +294,6 @@ class IsingModel:
                 order[iJ, ih] = np.mean(np.abs(mag))
         return order
 
-    # ------------------------------------------------------------------
-    # Time evolution
-    # ------------------------------------------------------------------
 
     @staticmethod
     def time_evolve(
@@ -356,13 +331,9 @@ class IsingModel:
         psi = state.copy().astype(np.complex128)
         for _ in range(n_steps):
             psi = U @ psi
-        # Re-normalise to mitigate floating-point drift
         psi /= la.norm(psi)
         return psi
 
-    # ------------------------------------------------------------------
-    # Convenience methods on instance
-    # ------------------------------------------------------------------
 
     def get_ground_state(self) -> Tuple[float, NDArray[np.complex128]]:
         """Ground-state energy and vector for *this* model instance."""

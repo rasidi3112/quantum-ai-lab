@@ -48,20 +48,11 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-# ---------------------------------------------------------------------------
-# Basis states and Bell pair
-# ---------------------------------------------------------------------------
 KET_0 = np.array([1.0, 0.0], dtype=complex)
 KET_1 = np.array([0.0, 1.0], dtype=complex)
 
-# |Ψ⁻⟩ = (|01⟩ − |10⟩) / √2  — the singlet Bell state.
-# With this state E(a,b) = -cos(a−b), which enables |S| = 2√2.
 BELL_PSI_MINUS = (np.kron(KET_0, KET_1) - np.kron(KET_1, KET_0)) / np.sqrt(2)
 
-
-# ---------------------------------------------------------------------------
-# Helper: single-qubit rotation about Z-then-X (measurement in angle θ)
-# ---------------------------------------------------------------------------
 
 def _rotation_basis_vectors(theta: float) -> Tuple[np.ndarray, np.ndarray]:
     """Return the two eigenstates of the observable σ_θ = cos(θ)σ_z + sin(θ)σ_x.
@@ -86,10 +77,6 @@ def _rotation_basis_vectors(theta: float) -> Tuple[np.ndarray, np.ndarray]:
     return plus_theta, minus_theta
 
 
-# ---------------------------------------------------------------------------
-# Statistics container
-# ---------------------------------------------------------------------------
-
 @dataclass
 class E91Statistics:
     """Diagnostics for an E91 protocol run."""
@@ -101,10 +88,6 @@ class E91Statistics:
     alice_key: List[int] = field(default_factory=list)
     bob_key: List[int] = field(default_factory=list)
 
-
-# ---------------------------------------------------------------------------
-# E91 Protocol
-# ---------------------------------------------------------------------------
 
 class E91Protocol:
     """Simulation of the E91 entanglement-based QKD protocol.
@@ -121,25 +104,12 @@ class E91Protocol:
     >>> print(f"CHSH S = {stats.chsh_value:.4f}, Bell violated = {stats.bell_violated}")
     """
 
-    # 5-angle protocol angle sets
-    # ----------------------------
-    # Index 0 and 1 are CHSH angles; index 2 is the dedicated key angle.
-    #
-    #   Alice:  a1=π/2 (idx 0)  a2=0 (idx 1)  a_k=3π/8 (idx 2)
-    #   Bob:    b1=π/4 (idx 0)  b2=−π/4 (idx 1)  b_k=3π/8 (idx 2)
-    #
-    # Key pair:  Alice idx 2 AND Bob idx 2  (both measure at 3π/8)
-    #            E(3π/8, 3π/8) = −1  → perfect anti-correlation → Bob flips
-    # CHSH:      Alice idx ∈ {0,1} AND Bob idx ∈ {0,1}
-    #            S = E(π/2,π/4)−E(π/2,−π/4)+E(0,π/4)+E(0,−π/4) = −2√2
-    # Wasted:    all remaining cross-index pairs (~44 % of total)
-    ALICE_ANGLES = (np.pi / 2, 0.0,           3 * np.pi / 8)  # a1, a2, a_k
-    BOB_ANGLES   = (np.pi / 4, -np.pi / 4,    3 * np.pi / 8)  # b1, b2, b_k
+    ALICE_ANGLES = (np.pi / 2, 0.0,           3 * np.pi / 8)
+    BOB_ANGLES   = (np.pi / 4, -np.pi / 4,    3 * np.pi / 8)
 
     def __init__(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(seed)
 
-    # ----- entangled pair generation ----------------------------------------
 
     @staticmethod
     def generate_entangled_pairs(n: int) -> List[np.ndarray]:
@@ -151,7 +121,6 @@ class E91Protocol:
         """
         return [BELL_PSI_MINUS.copy() for _ in range(n)]
 
-    # ----- measurement settings ---------------------------------------------
 
     @classmethod
     def choose_measurement_angles(cls) -> Tuple[Tuple[float, ...],
@@ -164,7 +133,6 @@ class E91Protocol:
         """
         return cls.ALICE_ANGLES, cls.BOB_ANGLES
 
-    # ----- single-pair measurement ------------------------------------------
 
     def measure_entangled(self, pair: np.ndarray,
                           angle_a: float,
@@ -188,22 +156,20 @@ class E91Protocol:
         a_plus, a_minus = _rotation_basis_vectors(angle_a)
         b_plus, b_minus = _rotation_basis_vectors(angle_b)
 
-        # Four joint projectors: |a±⟩⊗|b±⟩
         projectors = [
-            np.kron(a_plus,  b_plus),   # (0, 0)
-            np.kron(a_plus,  b_minus),  # (0, 1)
-            np.kron(a_minus, b_plus),   # (1, 0)
-            np.kron(a_minus, b_minus),  # (1, 1)
+            np.kron(a_plus,  b_plus),
+            np.kron(a_plus,  b_minus),
+            np.kron(a_minus, b_plus),
+            np.kron(a_minus, b_minus),
         ]
 
         probs = np.array([np.abs(np.vdot(p, pair)) ** 2 for p in projectors])
-        probs /= probs.sum()  # normalise for numerical safety
+        probs /= probs.sum()
 
         outcome_idx = self.rng.choice(4, p=probs)
         outcomes = [(0, 0), (0, 1), (1, 0), (1, 1)]
         return outcomes[outcome_idx]
 
-    # ----- CHSH computation -------------------------------------------------
 
     @staticmethod
     def compute_chsh(correlations: Dict[Tuple[float, float], float]) -> float:
@@ -238,7 +204,6 @@ class E91Protocol:
         float
             The CHSH parameter S.  Ideal value: ``−2√2 ≈ −2.828``.
         """
-        # CHSH angles — disjoint from the key angle (3π/8)
         a1, a2 = np.pi / 2, 0.0
         b1, b2 = np.pi / 4, -np.pi / 4
 
@@ -254,7 +219,6 @@ class E91Protocol:
         """Return True if |S| > 2 (Bell inequality violated)."""
         return abs(S) > 2.0
 
-    # ----- key extraction ---------------------------------------------------
 
     @staticmethod
     def extract_key(results: List[Tuple[int, int]]) -> Tuple[List[int],
@@ -273,7 +237,6 @@ class E91Protocol:
         bob_key   = [b for _, b in results]
         return alice_key, bob_key
 
-    # ----- full protocol ----------------------------------------------------
 
     def run_protocol(self, n_pairs: int = 1000
                      ) -> Tuple[np.ndarray, E91Statistics]:
@@ -292,11 +255,9 @@ class E91Protocol:
         pairs = self.generate_entangled_pairs(n_pairs)
         alice_angles, bob_angles = self.choose_measurement_angles()
 
-        # Random angle choices for each pair
         a_choices = self.rng.integers(0, 3, size=n_pairs)
         b_choices = self.rng.integers(0, 3, size=n_pairs)
 
-        # Containers
         key_results: List[Tuple[int, int]] = []
         corr_counts: Dict[Tuple[float, float], List[int]] = {}
 
@@ -305,36 +266,24 @@ class E91Protocol:
             bb = bob_angles[b_choices[i]]
             oa, ob = self.measure_entangled(pairs[i], aa, bb)
 
-            # ----------------------------------------------------------------
-            # Route each pair to its role:
-            #   KEY   — both chose index 2 (angle 3π/8): E=−1, perfect
-            #            anticorrelation → Bob flips bit to agree with Alice.
-            #   CHSH  — Alice idx ∈ {0,1} AND Bob idx ∈ {0,1}: the four
-            #            combinations that feed the CHSH inequality test.
-            #   WASTED — all remaining cross-index pairs: discarded.
-            # ----------------------------------------------------------------
             ai, bi = int(a_choices[i]), int(b_choices[i])
-            if ai == 2 and bi == 2:                 # key pair
-                key_results.append((oa, 1 - ob))   # Bob flips to agree
-            elif ai in (0, 1) and bi in (0, 1):    # CHSH pair
+            if ai == 2 and bi == 2:
+                key_results.append((oa, 1 - ob))
+            elif ai in (0, 1) and bi in (0, 1):
                 k = (round(aa, 10), round(bb, 10))
                 if k not in corr_counts:
                     corr_counts[k] = []
                 corr_counts[k].append((1 - 2 * oa) * (1 - 2 * ob))
-            # else: wasted pair — silently dropped
 
-        # Compute correlations
         correlations_raw: Dict[Tuple[float, float], float] = {}
         for k, products in corr_counts.items():
             correlations_raw[k] = float(np.mean(products))
 
-        # CHSH
         S = self.compute_chsh(correlations_raw)
         stats.chsh_value = S
         stats.bell_violated = self.check_bell_violation(S)
         stats.correlations = {str(k): v for k, v in correlations_raw.items()}
 
-        # Key extraction
         alice_key, bob_key = self.extract_key(key_results)
         stats.alice_key = alice_key
         stats.bob_key = bob_key

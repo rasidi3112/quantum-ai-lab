@@ -4,10 +4,6 @@ import sys
 import math
 import struct
 
-# ======================
-# Inisialisasi
-# ======================
-# Inisialisasi mixer audio dengan aman sebelum pygame.init()
 try:
     pygame.mixer.pre_init(44100, -16, 1)
 except Exception:
@@ -15,12 +11,10 @@ except Exception:
 
 pygame.init()
 
-# Konstanta
 LEBAR, TINGGI = 600, 400
 UKURAN_SEL = 20
 KECEPATAN_AWAL = 10
 
-# Warna
 HITAM = (20, 20, 20)
 PUTIH = (255, 255, 255)
 HIJAU = (0, 200, 0)
@@ -30,9 +24,6 @@ ABU = (40, 40, 40)
 ABU_TERANG = (150, 150, 150)
 KUNING = (255, 200, 0)
 
-# ======================
-# Audio Synth Retro
-# ======================
 def buat_suara_synth(frekuensi_awal, frekuensi_akhir, durasi_detik, volume=0.3):
     try:
         sample_rate = 44100
@@ -49,7 +40,6 @@ def buat_suara_synth(frekuensi_awal, frekuensi_akhir, durasi_detik, volume=0.3):
     except Exception:
         return None
 
-# Buat objek suara dengan aman
 suara_makan_normal = buat_suara_synth(400, 800, 0.08, volume=0.25)
 suara_makan_emas = buat_suara_synth(523, 1046, 0.15, volume=0.3)
 suara_makan_biru = buat_suara_synth(600, 300, 0.2, volume=0.3)
@@ -106,7 +96,6 @@ class Ular:
             self.badan_sebelumnya.append(self.badan_sebelumnya[-1])
 
     def ubah_arah(self, arah_baru):
-        # Cegah ular berbalik arah langsung (nabrak badan sendiri seketika)
         if (arah_baru[0] * -1, arah_baru[1] * -1) != self.arah:
             self.arah_berikutnya = arah_baru
 
@@ -121,7 +110,6 @@ class Ular:
         return x < 0 or x >= LEBAR or y < 0 or y >= TINGGI
 
     def gambar(self, layar, t=1.0):
-        # Update waktu animasi untuk lidah
         self.waktu_animasi += 0.25
         
         for i, segmen in enumerate(self.badan):
@@ -130,7 +118,6 @@ class Ular:
             x = int(lerp(pos_lama[0], pos_baru[0], t))
             y = int(lerp(pos_lama[1], pos_baru[1], t))
 
-            # Hitung ukuran segmen yang mengecil secara bertahap (tapering)
             skala = 1.0 - 0.35 * (i / len(self.badan))
             ukuran_gambar = int(UKURAN_SEL * skala)
             offset = (UKURAN_SEL - ukuran_gambar) // 2
@@ -139,7 +126,6 @@ class Ular:
 
             warna = HIJAU_TERANG if i == 0 else HIJAU
             
-            # Neon Glow
             glow_sz = ukuran_gambar + 12
             glow_surf = pygame.Surface((glow_sz, glow_sz), pygame.SRCALPHA)
             pygame.draw.rect(glow_surf, (*warna, 25), (0, 0, glow_sz, glow_sz), border_radius=int(6 * skala))
@@ -150,13 +136,11 @@ class Ular:
             pygame.draw.rect(layar, warna, rect, border_radius=int(4 * skala))
             pygame.draw.rect(layar, HITAM, rect, width=1, border_radius=int(4 * skala))
 
-            # Gambar Detail Kepala (Mata & Lidah)
             if i == 0:
                 cx = x + UKURAN_SEL // 2
                 cy = y + UKURAN_SEL // 2
                 dx, dy = self.arah
                 
-                # Lidah berkedip (muncul jika sinus positif besar)
                 if math.sin(self.waktu_animasi) > 0.4:
                     t_len = 8
                     if dx != 0:
@@ -174,7 +158,6 @@ class Ular:
                     pygame.draw.line(layar, MERAH, mid_pt, branch1, 2)
                     pygame.draw.line(layar, MERAH, mid_pt, branch2, 2)
 
-                # Posisi mata
                 if dx != 0:
                     eye_dx = 3 if dx > 0 else -3
                     mata1 = (cx + eye_dx, y + 5)
@@ -186,10 +169,8 @@ class Ular:
                     mata2 = (x + UKURAN_SEL - 5, cy + eye_dy)
                     pupil_offset = (0, 1 if dy > 0 else -1)
                 
-                # Gambar mata putih
                 pygame.draw.circle(layar, PUTIH, mata1, 3.5)
                 pygame.draw.circle(layar, PUTIH, mata2, 3.5)
-                # Gambar pupil hitam
                 pygame.draw.circle(layar, HITAM, (mata1[0] + pupil_offset[0], mata1[1] + pupil_offset[1]), 1.5)
                 pygame.draw.circle(layar, HITAM, (mata2[0] + pupil_offset[0], mata2[1] + pupil_offset[1]), 1.5)
 
@@ -213,7 +194,6 @@ class Makanan:
         if pilihan:
             self.posisi = random.choice(pilihan)
             
-            # Tentukan tipe makanan secara acak
             r = random.random()
             if r < 0.15:
                 self.tipe = "emas"
@@ -245,7 +225,6 @@ class Makanan:
         denyut = math.sin(self.waktu) * 2.5
         x, y = self.posisi
 
-        # Glow denyut
         glow_ukuran = int(UKURAN_SEL + 14 + denyut * 2)
         if glow_ukuran > 0:
             glow_surf = pygame.Surface((glow_ukuran, glow_ukuran), pygame.SRCALPHA)
@@ -253,14 +232,12 @@ class Makanan:
             pygame.draw.circle(glow_surf, (*self.warna, 75), (glow_ukuran // 2, glow_ukuran // 2), max(1, (glow_ukuran // 2) - 3))
             layar.blit(glow_surf, (x - (glow_ukuran - UKURAN_SEL) // 2, y - (glow_ukuran - UKURAN_SEL) // 2))
 
-        # Core
         center_x = x + UKURAN_SEL // 2
         center_y = y + UKURAN_SEL // 2
         r_core = int(max(4, UKURAN_SEL // 2 + denyut // 2))
         pygame.draw.circle(layar, self.warna, (center_x, center_y), r_core)
         pygame.draw.circle(layar, PUTIH, (center_x - 3, center_y - 3), max(1, r_core // 3))
 
-        # Gambar ring timer jika makanan spesial
         if self.tipe != "normal" and self.sisa_waktu > 0:
             rasio = self.sisa_waktu / self.durasi_maksimal
             radius_ring = UKURAN_SEL // 2 + 6
@@ -362,11 +339,10 @@ def main():
 
     partikel_list = []
 
-    # Logic & frame timing variables
     waktu_langkah_terakhir = pygame.time.get_ticks()
     waktu_frame_terakhir = pygame.time.get_ticks()
 
-    durasi_lambat_aktif = 0.0 # dalam milidetik
+    durasi_lambat_aktif = 0.0
 
     berjalan = True
     while berjalan:
@@ -374,7 +350,6 @@ def main():
         dt_ms = current_time - waktu_frame_terakhir
         waktu_frame_terakhir = current_time
 
-        # Update durasi slow motion
         if durasi_lambat_aktif > 0:
             durasi_lambat_aktif -= dt_ms
             kecepatan = max(5, kecepatan_dasar - 4)
@@ -383,7 +358,6 @@ def main():
 
         durasi_langkah = 1000.0 / kecepatan
 
-        # Update timer makanan
         makanan.update(dt_ms)
 
         for event in pygame.event.get():
@@ -414,7 +388,6 @@ def main():
                         partikel_list = []
                         waktu_langkah_terakhir = pygame.time.get_ticks()
 
-        # Update logic independently of render rate
         if not status_game_over:
             waktu_lewat = current_time - waktu_langkah_terakhir
             t_interpolasi = waktu_lewat / durasi_langkah
@@ -430,7 +403,6 @@ def main():
                 if ular.badan[0] == makanan.posisi:
                     ular.makan()
                     
-                    # Logika makanan spesifik
                     suara_diputar = suara_makan_normal
                     warna_partikel_utama = MERAH
                     
@@ -442,12 +414,11 @@ def main():
                         skor += 1
                         suara_diputar = suara_makan_biru
                         warna_partikel_utama = (0, 150, 255)
-                        durasi_lambat_aktif = 5000.0  # 5 detik lambat
+                        durasi_lambat_aktif = 5000.0
                     elif makanan.tipe == "ungu":
                         skor += 1
                         suara_diputar = suara_makan_ungu
                         warna_partikel_utama = (200, 0, 255)
-                        # Potong 2 ekor
                         for _ in range(2):
                             if len(ular.badan) > 1:
                                 ular.badan.pop()
@@ -460,7 +431,6 @@ def main():
 
                     putar_suara(suara_diputar)
 
-                    # Spawn partikel ledakan makan
                     for _ in range(15):
                         warna_partikel = random.choice([warna_partikel_utama, KUNING, PUTIH])
                         partikel_list.append(Partikel(makanan.posisi[0] + UKURAN_SEL // 2, makanan.posisi[1] + UKURAN_SEL // 2, warna_partikel))
@@ -468,19 +438,16 @@ def main():
                     makanan.posisi_baru(ular.badan)
                     kecepatan_dasar = KECEPATAN_AWAL + skor // 5
 
-                # Adjust step timer
                 waktu_langkah_terakhir += int(t_interpolasi) * durasi_langkah
                 t_interpolasi = 0.0
         else:
             t_interpolasi = 1.0
 
-        # Update partikel
         for p in partikel_list[:]:
             p.update()
             if p.life <= 0:
                 partikel_list.remove(p)
 
-        # Drawing
         layar.fill(HITAM)
         gambar_grid(layar)
         makanan.gambar(layar)
@@ -488,13 +455,11 @@ def main():
         t_clamp = max(0.0, min(t_interpolasi, 1.0))
         ular.gambar(layar, t=t_clamp)
         
-        # Gambar partikel
         for p in partikel_list:
             p.gambar(layar)
 
         tampilkan_skor(layar, skor, skor_tertinggi)
         
-        # Tampilkan teks Slow Motion jika aktif
         if durasi_lambat_aktif > 0:
             teks_lambat = font_kecil.render(f"Slow Motion: {max(0.0, durasi_lambat_aktif / 1000.0):.1f}s", True, (0, 150, 255))
             layar.blit(teks_lambat, (10, 70))

@@ -36,7 +36,6 @@ class QuantumNeuralNetwork:
         Measurement strategy: 'expval' (expectation values) or 'probs' (probabilities).
     """
 
-    # Fundamental gates
     I = np.eye(2, dtype=complex)
     H = np.array([[1, 1], [1, -1]], dtype=complex) / np.sqrt(2)
     X = np.array([[0, 1], [1, 0]], dtype=complex)
@@ -58,13 +57,9 @@ class QuantumNeuralNetwork:
         self.dim = 2 ** n_qubits
         self.rng = np.random.RandomState(random_state)
 
-        # Parameters: 3 rotations per qubit per layer (RX, RY, RZ)
         self.n_params = 3 * n_qubits * n_layers
         self.weights = self.rng.uniform(-np.pi, np.pi, self.n_params)
 
-    # ------------------------------------------------------------------
-    # Gate helpers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _kron_list(matrices: list[np.ndarray]) -> np.ndarray:
@@ -105,9 +100,6 @@ class QuantumNeuralNetwork:
                 new_state[k] += state[k]
         return new_state
 
-    # ------------------------------------------------------------------
-    # Encoding
-    # ------------------------------------------------------------------
 
     def amplitude_encoding(self, x: np.ndarray) -> np.ndarray:
         """Encode data vector into quantum state amplitudes.
@@ -120,7 +112,6 @@ class QuantumNeuralNetwork:
         n = min(len(x), self.dim)
         state[:n] = x[:n]
 
-        # Normalize
         norm = np.linalg.norm(state)
         if norm > 1e-10:
             state /= norm
@@ -150,9 +141,6 @@ class QuantumNeuralNetwork:
         else:
             return self.angle_encoding(x)
 
-    # ------------------------------------------------------------------
-    # Variational circuit
-    # ------------------------------------------------------------------
 
     def _variational_layer(
         self, state: np.ndarray, params: np.ndarray
@@ -163,13 +151,11 @@ class QuantumNeuralNetwork:
         """
         n = self.n_qubits
 
-        # Rotation sub-layer
         for q in range(n):
             state = self._apply_gate(self._rx(params[3 * q]), q, state)
             state = self._apply_gate(self._ry(params[3 * q + 1]), q, state)
             state = self._apply_gate(self._rz(params[3 * q + 2]), q, state)
 
-        # Entanglement: circular CNOT chain
         for q in range(n - 1):
             state = self._apply_cnot(q, q + 1, state)
         if n > 1:
@@ -177,9 +163,6 @@ class QuantumNeuralNetwork:
 
         return state
 
-    # ------------------------------------------------------------------
-    # Measurement
-    # ------------------------------------------------------------------
 
     def _measure_expval(self, state: np.ndarray) -> np.ndarray:
         """Measure expectation value ⟨Zᵢ⟩ for each qubit."""
@@ -195,9 +178,6 @@ class QuantumNeuralNetwork:
         """Return measurement probabilities |⟨i|ψ⟩|² for all basis states."""
         return np.abs(state) ** 2
 
-    # ------------------------------------------------------------------
-    # Forward pass
-    # ------------------------------------------------------------------
 
     def forward(
         self,
@@ -221,17 +201,14 @@ class QuantumNeuralNetwork:
         if weights is None:
             weights = self.weights
 
-        # Encode
         state = self.encode(x)
 
-        # Variational layers
         params_per_layer = 3 * self.n_qubits
         for layer in range(self.n_layers):
             start = layer * params_per_layer
             end = start + params_per_layer
             state = self._variational_layer(state, weights[start:end])
 
-        # Measure
         if self.measurement == "expval":
             return self._measure_expval(state)
         else:

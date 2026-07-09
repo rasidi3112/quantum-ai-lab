@@ -25,7 +25,6 @@ from quantum_rl.quantum_policy import QuantumPolicy
 from quantum_rl.hybrid_agent import HybridAgent
 from quantum_rl.quantum_environment import CartPoleEnv, FrozenLakeEnv
 
-# Convenience alias
 QuantumEnvironment = CartPoleEnv
 
 __all__ = [

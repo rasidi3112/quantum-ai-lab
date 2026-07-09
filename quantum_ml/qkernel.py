@@ -37,7 +37,6 @@ class QuantumKernel:
         Number of repetitions of the feature map circuit.
     """
 
-    # --- Fundamental gates ---------------------------------------------------
     I = np.eye(2, dtype=complex)
     H = np.array([[1, 1], [1, -1]], dtype=complex) / np.sqrt(2)
     Z = np.array([[1, 0], [0, -1]], dtype=complex)
@@ -47,9 +46,6 @@ class QuantumKernel:
         self.n_layers = n_layers
         self.dim = 2 ** n_qubits
 
-    # ------------------------------------------------------------------
-    # Gate helpers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _kron_list(matrices: list[np.ndarray]) -> np.ndarray:
@@ -77,17 +73,13 @@ class QuantumKernel:
         dim = self.dim
         op = np.eye(dim, dtype=complex)
         for k in range(dim):
-            # Compute eigenvalue of ZᵢZⱼ for computational basis state |k⟩
             bit_i = (k >> (self.n_qubits - 1 - qubit_i)) & 1
             bit_j = (k >> (self.n_qubits - 1 - qubit_j)) & 1
-            z_i = 1 - 2 * bit_i  # eigenvalue of Z: +1 for |0⟩, -1 for |1⟩
+            z_i = 1 - 2 * bit_i
             z_j = 1 - 2 * bit_j
             op[k, k] = np.exp(1j * angle * z_i * z_j)
         return op
 
-    # ------------------------------------------------------------------
-    # Feature map
-    # ------------------------------------------------------------------
 
     def _feature_map_circuit(self, x: np.ndarray) -> np.ndarray:
         """Build the ZZFeatureMap unitary for data vector x.
@@ -101,17 +93,14 @@ class QuantumKernel:
         U = np.eye(self.dim, dtype=complex)
 
         for _ in range(self.n_layers):
-            # Hadamard layer
             H_all = self._kron_list([self.H] * n)
             U = H_all @ U
 
-            # Single-qubit Z-rotation encoding
             for i in range(n):
                 idx = i % len(x)
                 rz_full = self._apply_single_gate(self._rz(x[idx]), i)
                 U = rz_full @ U
 
-            # ZZ entangling layer
             for i in range(n):
                 for j in range(i + 1, n):
                     idx_i = i % len(x)
@@ -136,14 +125,10 @@ class QuantumKernel:
             Quantum state vector of shape (2^n_qubits,).
         """
         U = self._feature_map_circuit(x)
-        # Apply to |0...0⟩
         state = np.zeros(self.dim, dtype=complex)
         state[0] = 1.0
         return U @ state
 
-    # ------------------------------------------------------------------
-    # Kernel computation
-    # ------------------------------------------------------------------
 
     def evaluate(self, x1: np.ndarray, x2: np.ndarray) -> float:
         """Compute quantum kernel value K(x₁, x₂) = |⟨φ(x₁)|φ(x₂)⟩|².
@@ -221,7 +206,6 @@ class QuantumKernel:
         K_train = self.kernel_matrix(X_train)
         K_test = self.kernel_matrix(X_test, X_train)
 
-        # Kernel ridge regression: w = (K + αI)⁻¹ y
         n = len(y_train)
         weights = np.linalg.solve(K_train + alpha * np.eye(n), y_train)
         predictions = K_test @ weights

@@ -33,10 +33,6 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 
-# ---------------------------------------------------------------------------
-# Training result
-# ---------------------------------------------------------------------------
-
 @dataclass
 class ClassifierResult:
     """Diagnostics from training a HybridClassifier."""
@@ -45,10 +41,6 @@ class ClassifierResult:
     final_loss: float = 0.0
     final_accuracy: float = 0.0
 
-
-# ---------------------------------------------------------------------------
-# Simple classical layers (numpy-only)
-# ---------------------------------------------------------------------------
 
 def _relu(x: np.ndarray) -> np.ndarray:
     return np.maximum(0, x)
@@ -62,10 +54,6 @@ def _softmax(x: np.ndarray) -> np.ndarray:
 def _cross_entropy(probs: np.ndarray, label: int) -> float:
     return -np.log(np.clip(probs[label], 1e-15, 1.0))
 
-
-# ---------------------------------------------------------------------------
-# Quantum circuit primitives (statevector simulation)
-# ---------------------------------------------------------------------------
 
 _I2 = np.eye(2, dtype=np.complex128)
 
@@ -132,23 +120,19 @@ def _quantum_forward(x: np.ndarray, q_params: np.ndarray,
     state = np.zeros(dim, dtype=np.complex128)
     state[0] = 1.0
 
-    # Angle encoding
     for q in range(n_qubits):
         idx = q % len(x)
         state = _apply_single_gate(state, _ry(x[idx]), q, n_qubits)
 
-    # Variational layers
     params_per_layer = 2 * n_qubits
     for layer in range(n_layers):
         start = layer * params_per_layer
         lp = q_params[start : start + params_per_layer]
 
-        # RY-RZ rotations
         for q in range(n_qubits):
             state = _apply_single_gate(state, _ry(lp[q]), q, n_qubits)
             state = _apply_single_gate(state, _rz(lp[n_qubits + q]), q, n_qubits)
 
-        # CNOT ring
         for q in range(n_qubits - 1):
             state = _apply_cnot(state, q, q + 1, n_qubits)
         if n_qubits > 1:
@@ -156,10 +140,6 @@ def _quantum_forward(x: np.ndarray, q_params: np.ndarray,
 
     return np.abs(state) ** 2
 
-
-# ---------------------------------------------------------------------------
-# Hybrid Classifier
-# ---------------------------------------------------------------------------
 
 class HybridClassifier:
     """Hybrid classical-quantum image classifier.
@@ -202,7 +182,6 @@ class HybridClassifier:
         self.n_classes = n_classes
         self._rng = np.random.default_rng(seed)
 
-        # Classical MLP parameters (Xavier initialisation)
         lim1 = np.sqrt(6.0 / (input_dim + hidden_dim))
         self.W1 = self._rng.uniform(-lim1, lim1, (hidden_dim, input_dim))
         self.b1 = np.zeros(hidden_dim)
@@ -211,17 +190,14 @@ class HybridClassifier:
         self.W2 = self._rng.uniform(-lim2, lim2, (n_qubits, hidden_dim))
         self.b2 = np.zeros(n_qubits)
 
-        # Quantum parameters
         self.n_q_params = n_layers * 2 * n_qubits
         self.q_params = self._rng.normal(0, 0.1, size=self.n_q_params)
 
-        # Readout: map quantum probabilities → class logits
         dim_q = 2 ** n_qubits
         lim3 = np.sqrt(6.0 / (dim_q + n_classes))
         self.W_out = self._rng.uniform(-lim3, lim3, (n_classes, dim_q))
         self.b_out = np.zeros(n_classes)
 
-    # ---- forward pass --------------------------------------------------- #
 
     def _classical_forward(self, x: np.ndarray) -> np.ndarray:
         """Two-layer MLP: x → hidden → encoded angles.
@@ -257,7 +233,6 @@ class HybridClassifier:
         logits = self.W_out @ q_probs + self.b_out
         return _softmax(logits)
 
-    # ---- training ------------------------------------------------------- #
 
     def train(
         self,
@@ -302,7 +277,6 @@ class HybridClassifier:
                   f"lr={lr}, batch={batch_size}")
 
         for epoch in range(epochs):
-            # Shuffle
             perm = self._rng.permutation(n_samples)
             epoch_loss = 0.0
             correct = 0
@@ -313,7 +287,6 @@ class HybridClassifier:
                 X_batch = X_train[batch_idx]
                 y_batch = y_train[batch_idx]
 
-                # Compute batch loss and gradients
                 batch_loss, batch_correct = self._update_step(
                     X_batch, y_batch, lr, epsilon
                 )
@@ -351,7 +324,6 @@ class HybridClassifier:
         batch_loss = 0.0
         correct = 0
 
-        # --- Quantum parameter gradients (finite difference) ---
         q_grad = np.zeros_like(self.q_params)
         for i in range(len(self.q_params)):
             loss_plus = 0.0
@@ -365,13 +337,12 @@ class HybridClassifier:
             for x, y in zip(X_batch, y_batch):
                 probs = self.forward(x)
                 loss_minus += _cross_entropy(probs, int(y))
-            self.q_params[i] += epsilon  # restore
+            self.q_params[i] += epsilon
 
             q_grad[i] = (loss_plus - loss_minus) / (2 * epsilon * len(X_batch))
 
         self.q_params -= lr * q_grad
 
-        # --- Readout layer gradients (finite difference) ---
         for i in range(self.W_out.shape[0]):
             for j in range(self.W_out.shape[1]):
                 l_p, l_m = 0.0, 0.0
@@ -395,7 +366,6 @@ class HybridClassifier:
             self.b_out[i] += epsilon
             self.b_out[i] -= lr * (l_p - l_m) / (2 * epsilon * len(X_batch))
 
-        # Compute final batch metrics
         for x, y in zip(X_batch, y_batch):
             probs = self.forward(x)
             batch_loss += _cross_entropy(probs, int(y))
@@ -404,7 +374,6 @@ class HybridClassifier:
 
         return batch_loss, correct
 
-    # ---- inference ------------------------------------------------------ #
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Predict class labels.

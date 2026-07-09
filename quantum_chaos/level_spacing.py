@@ -59,9 +59,6 @@ class LevelSpacing:
     def __init__(self) -> None:
         pass
 
-    # ------------------------------------------------------------------
-    # Core computations
-    # ------------------------------------------------------------------
 
     @staticmethod
     def compute_spacings(
@@ -115,24 +112,17 @@ class LevelSpacing:
         E = sorted_eigenvalues
         N = len(E)
 
-        # Staircase function: N(E_i) = i
         staircase = np.arange(N, dtype=np.float64)
 
-        # Fit polynomial to staircase
         coeffs = np.polyfit(E, staircase, poly_order)
         N_smooth = np.polyval(coeffs, E)
 
-        # Unfolded spacings
         spacings = np.diff(N_smooth)
 
-        # Remove any non-positive spacings (numerical artifacts)
         spacings = spacings[spacings > 0]
 
         return spacings
 
-    # ------------------------------------------------------------------
-    # Theoretical distributions
-    # ------------------------------------------------------------------
 
     @staticmethod
     def wigner_surmise(s: np.ndarray) -> np.ndarray:
@@ -222,9 +212,6 @@ class LevelSpacing:
         """
         return (32 / np.pi ** 2) * s ** 2 * np.exp(-4 * s ** 2 / np.pi)
 
-    # ------------------------------------------------------------------
-    # Ratio statistic
-    # ------------------------------------------------------------------
 
     @staticmethod
     def ratio_statistic(eigenvalues: np.ndarray) -> dict:
@@ -253,19 +240,16 @@ class LevelSpacing:
         E = np.sort(np.real(eigenvalues))
         spacings = np.diff(E)
 
-        # Remove zero spacings (degenerate levels)
         spacings = spacings[spacings > 1e-14]
 
         if len(spacings) < 2:
             return {"r_values": np.array([]), "r_mean": np.nan, "diagnosis": "N/A"}
 
-        # Consecutive spacing ratios
         ratios = spacings[1:] / spacings[:-1]
         r_tilde = np.minimum(ratios, 1.0 / ratios)
 
         r_mean = float(np.mean(r_tilde))
 
-        # Diagnose
         if r_mean < 0.44:
             diagnosis = "Poisson (integrable)"
         elif r_mean > 0.50:
@@ -279,9 +263,6 @@ class LevelSpacing:
             "diagnosis": diagnosis,
         }
 
-    # ------------------------------------------------------------------
-    # Brody parameter fitting
-    # ------------------------------------------------------------------
 
     @staticmethod
     def fit_brody(spacings: np.ndarray) -> tuple[float, float]:
@@ -299,13 +280,11 @@ class LevelSpacing:
         q_err : float
             Standard error of q from the fit.
         """
-        # Build histogram
         s_max = min(float(np.max(spacings)), 5.0)
         bins = np.linspace(0, s_max, 50)
         hist, bin_edges = np.histogram(spacings, bins=bins, density=True)
         s_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-        # Remove zero bins
         mask = hist > 0
         s_fit = s_centers[mask]
         p_fit = hist[mask]
@@ -323,9 +302,6 @@ class LevelSpacing:
 
         return q, q_err
 
-    # ------------------------------------------------------------------
-    # Full analysis
-    # ------------------------------------------------------------------
 
     def analyze(self, hamiltonian: np.ndarray) -> dict:
         """Complete level spacing analysis of a Hamiltonian.
@@ -350,19 +326,14 @@ class LevelSpacing:
             - 'ratio_stat': ratio statistic results (dict)
             - 'diagnosis': chaos classification string
         """
-        # Diagonalize
         eigenvalues = np.linalg.eigvalsh(hamiltonian)
 
-        # Compute spacings
         spacings = self.compute_spacings(eigenvalues, unfold=True)
 
-        # Fit Brody
         q, q_err = self.fit_brody(spacings)
 
-        # Ratio statistic
         ratio = self.ratio_statistic(eigenvalues)
 
-        # Diagnosis
         if q < 0.3:
             diagnosis = "Poisson (integrable)"
         elif q > 0.7:

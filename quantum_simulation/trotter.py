@@ -54,9 +54,6 @@ class TrotterEvolution:
     instance can also be created for convenience.
     """
 
-    # ----------------------------------------------------------------
-    # Single-step propagators
-    # ----------------------------------------------------------------
 
     @staticmethod
     def first_order(
@@ -116,11 +113,9 @@ class TrotterEvolution:
         dim = H_list[0].shape[0]
         U = np.eye(dim, dtype=np.complex128)
 
-        # Forward sweep with dt/2
         for Hk in H_list:
             U = la.expm(-1j * Hk * dt / 2) @ U
 
-        # Reverse sweep with dt/2
         for Hk in reversed(H_list):
             U = la.expm(-1j * Hk * dt / 2) @ U
 
@@ -155,12 +150,8 @@ class TrotterEvolution:
         s2_p  = TrotterEvolution.second_order(H_list, p * dt)
         s2_m  = TrotterEvolution.second_order(H_list, (1.0 - 4.0 * p) * dt)
 
-        # S4 = S2(p)^2  ·  S2(1-4p)  ·  S2(p)^2
         return s2_p @ s2_p @ s2_m @ s2_p @ s2_p
 
-    # ----------------------------------------------------------------
-    # Full time evolution
-    # ----------------------------------------------------------------
 
     @staticmethod
     def evolve(
@@ -208,9 +199,6 @@ class TrotterEvolution:
         psi /= la.norm(psi)
         return psi
 
-    # ----------------------------------------------------------------
-    # Exact reference evolution
-    # ----------------------------------------------------------------
 
     @staticmethod
     def exact_evolution(
@@ -239,9 +227,6 @@ class TrotterEvolution:
         psi /= la.norm(psi)
         return psi
 
-    # ----------------------------------------------------------------
-    # Error analysis
-    # ----------------------------------------------------------------
 
     @staticmethod
     def error_bound(
@@ -274,7 +259,6 @@ class TrotterEvolution:
         float
             Estimated error per step.
         """
-        # Sum of commutator norms
         comm_norm = 0.0
         K = len(H_list)
         for j in range(K):
@@ -287,7 +271,7 @@ class TrotterEvolution:
         elif order == 2:
             return (1.0 / 12.0) * comm_norm * dt ** 3
         elif order == 4:
-            return comm_norm * dt ** 5   # rough estimate
+            return comm_norm * dt ** 5
         else:
             raise ValueError(f"Unsupported order {order}")
 

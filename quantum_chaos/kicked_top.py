@@ -81,9 +81,6 @@ class KickedTop:
         self.Jx, self.Jy, self.Jz = self._build_angular_momentum()
         self._floquet = self._build_floquet_operator()
 
-    # ------------------------------------------------------------------
-    # Angular momentum operators
-    # ------------------------------------------------------------------
 
     def _build_angular_momentum(
         self,
@@ -106,31 +103,22 @@ class KickedTop:
         j = self.j
         dim = self.dim
 
-        # m values from j down to -j (standard convention)
         m_vals = np.arange(j, -j - 1, -1, dtype=np.float64)
 
-        # Jz is diagonal
         Jz = np.diag(m_vals).astype(np.complex128)
 
-        # Raising operator J+: ⟨m+1|J+|m⟩ = √(j(j+1) - m(m+1))
-        # In our ordering, m+1 is at index one before m
         Jp = np.zeros((dim, dim), dtype=np.complex128)
         for idx in range(1, dim):
-            m = m_vals[idx]  # m value at index idx
+            m = m_vals[idx]
             Jp[idx - 1, idx] = np.sqrt(j * (j + 1) - m * (m + 1))
 
-        # Lowering operator J- = (J+)†
         Jm = Jp.conj().T
 
-        # Jx = (J+ + J-)/2, Jy = (J+ - J-)/(2i)
         Jx = (Jp + Jm) / 2.0
         Jy = (Jp - Jm) / (2.0j)
 
         return Jx, Jy, Jz
 
-    # ------------------------------------------------------------------
-    # Floquet operator
-    # ------------------------------------------------------------------
 
     def _build_floquet_operator(self) -> np.ndarray:
         """Build the Floquet (one-period) operator.
@@ -147,10 +135,8 @@ class KickedTop:
         """
         j = self.j
 
-        # Torsion (kick): exp(-i k/(2j) Jz²)
         U_kick = expm(-1j * self.k / (2.0 * j) * self.Jz @ self.Jz)
 
-        # Precession: exp(-i p Jy)
         U_prec = expm(-1j * self.p * self.Jy)
 
         return U_kick @ U_prec
@@ -178,9 +164,6 @@ class KickedTop:
         quasi_e = -np.angle(evals)
         return np.sort(quasi_e)
 
-    # ------------------------------------------------------------------
-    # State preparation
-    # ------------------------------------------------------------------
 
     def coherent_state(self, theta: float, phi: float) -> np.ndarray:
         """Construct a spin coherent state |θ, φ⟩.
@@ -217,8 +200,7 @@ class KickedTop:
         s = np.sin(theta / 2)
 
         for idx in range(dim):
-            m = j - idx  # m goes from j down to -j
-            # Binomial coefficient: C(2j, j-m)
+            m = j - idx
             binom = 1.0
             jmm = int(j - m)
             jpm = int(j + m)
@@ -232,13 +214,9 @@ class KickedTop:
                 * np.exp(-1j * jmm * phi)
             )
 
-        # Normalize (should already be normalized, but ensure numerics)
         state /= np.linalg.norm(state)
         return state
 
-    # ------------------------------------------------------------------
-    # Time evolution
-    # ------------------------------------------------------------------
 
     def evolve(
         self, state: np.ndarray, n_kicks: int
@@ -287,9 +265,6 @@ class KickedTop:
             trajectory[t + 1] = state.copy()
         return trajectory
 
-    # ------------------------------------------------------------------
-    # Husimi Q representation
-    # ------------------------------------------------------------------
 
     def husimi_q(
         self,
@@ -356,9 +331,6 @@ class KickedTop:
         Q = self.husimi_q(state, theta_grid, phi_grid)
         return theta_grid, phi_grid, Q
 
-    # ------------------------------------------------------------------
-    # Classical limit expectations
-    # ------------------------------------------------------------------
 
     def expectation_values(
         self, state: np.ndarray

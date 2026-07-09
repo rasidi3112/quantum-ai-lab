@@ -43,9 +43,6 @@ class MaxCutSolver:
     def __init__(self, n_nodes: int) -> None:
         self.n_nodes = n_nodes
 
-    # ----------------------------------------------------------------
-    # Graph generation
-    # ----------------------------------------------------------------
 
     @staticmethod
     def random_graph(
@@ -77,9 +74,6 @@ class MaxCutSolver:
                     edges.append((i, j))
         return edges
 
-    # ----------------------------------------------------------------
-    # Hamiltonian
-    # ----------------------------------------------------------------
 
     @staticmethod
     def graph_to_hamiltonian(
@@ -105,9 +99,6 @@ class MaxCutSolver:
         """
         return QAOA.cost_hamiltonian(graph, n_nodes, weights)
 
-    # ----------------------------------------------------------------
-    # Classical brute force
-    # ----------------------------------------------------------------
 
     @staticmethod
     def cut_value(
@@ -168,9 +159,6 @@ class MaxCutSolver:
                 best_bs = bs
         return {"max_cut": best_cut, "bitstring": best_bs, "all_cuts": all_cuts}
 
-    # ----------------------------------------------------------------
-    # QAOA wrapper
-    # ----------------------------------------------------------------
 
     def qaoa_solve(
         self,
@@ -199,7 +187,7 @@ class MaxCutSolver:
         result = qaoa.optimize(graph, p_layers, method, weights, maxiter)
 
         samples = QAOA.sample_solution(result["state"], n_samples=2048)
-        best_bs = max(samples, key=samples.get)  # type: ignore[arg-type]
+        best_bs = max(samples, key=samples.get)
         best_cut = self.cut_value(best_bs, graph, weights)
 
         return {
@@ -210,9 +198,6 @@ class MaxCutSolver:
             "qaoa_result": result,
         }
 
-    # ----------------------------------------------------------------
-    # Visualisation
-    # ----------------------------------------------------------------
 
     @staticmethod
     def visualize_graph(
@@ -242,11 +227,9 @@ class MaxCutSolver:
         if ax is None:
             _, ax = plt.subplots(1, 1, figsize=(6, 6))
 
-        # Simple circular layout
         angles = np.linspace(0, 2 * np.pi, n_nodes, endpoint=False)
         pos = {i: (np.cos(a), np.sin(a)) for i, a in enumerate(angles)}
 
-        # Draw edges
         for i, j in graph:
             xi, yi = pos[i]
             xj, yj = pos[j]
@@ -257,7 +240,6 @@ class MaxCutSolver:
             lw = 2.5 if cut_edge else 1.0
             ax.plot([xi, xj], [yi, yj], color=color, linewidth=lw, zorder=1)
 
-        # Draw nodes
         for node in range(n_nodes):
             x, y = pos[node]
             if partition is not None:

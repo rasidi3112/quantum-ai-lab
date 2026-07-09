@@ -44,10 +44,6 @@ import numpy as np
 from quantum_rl.quantum_policy import QuantumPolicy
 
 
-# ---------------------------------------------------------------------------
-# Training result container
-# ---------------------------------------------------------------------------
-
 @dataclass
 class TrainingResult:
     """Container for training diagnostics."""
@@ -58,10 +54,6 @@ class TrainingResult:
     final_params: Optional[np.ndarray] = None
     final_classical_params: Optional[Dict[str, np.ndarray]] = None
 
-
-# ---------------------------------------------------------------------------
-# Hybrid Agent
-# ---------------------------------------------------------------------------
 
 class HybridAgent:
     """Hybrid classical-quantum reinforcement learning agent.
@@ -112,7 +104,6 @@ class HybridAgent:
         self.gamma = gamma
         self._rng = np.random.default_rng(seed)
 
-        # Quantum policy
         self.policy = QuantumPolicy(
             n_qubits=n_qubits,
             n_layers=n_layers,
@@ -120,21 +111,16 @@ class HybridAgent:
             seed=seed,
         )
 
-        # Classical pre-processing layer: obs → rotation angles
-        # Xavier-like initialisation
         limit = np.sqrt(6.0 / (obs_dim + n_qubits))
         self.classical_W = self._rng.uniform(-limit, limit, size=(n_qubits, obs_dim))
         self.classical_b = np.zeros(n_qubits)
 
-        # Quantum circuit parameters
         n_params = QuantumPolicy.n_params(n_qubits, n_layers)
         self.quantum_params = self._rng.normal(0, 0.1, size=n_params)
 
-        # Baseline (moving average of returns) for variance reduction
         self._baseline = 0.0
         self._baseline_count = 0
 
-    # ----- forward pass -------------------------------------------------- #
 
     def _preprocess(self, observation: np.ndarray) -> np.ndarray:
         """Classical linear layer: obs → encoded angles.
@@ -181,7 +167,6 @@ class HybridAgent:
         probs = self.get_action_probs(observation)
         return int(self._rng.choice(self.n_actions, p=probs))
 
-    # ----- trajectory collection ----------------------------------------- #
 
     @staticmethod
     def _compute_returns(
@@ -210,10 +195,10 @@ class HybridAgent:
         return returns
 
     def _collect_episode(self, env: Any) -> Tuple[
-        List[np.ndarray],  # observations
-        List[int],         # actions
-        List[float],       # rewards
-        int,               # episode length
+        List[np.ndarray],
+        List[int],
+        List[float],
+        int,
     ]:
         """Run a single episode and collect the trajectory.
 
@@ -243,7 +228,6 @@ class HybridAgent:
 
         return observations, actions, rewards, len(rewards)
 
-    # ----- training ------------------------------------------------------ #
 
     def _update_baseline(self, total_return: float) -> float:
         """Update running-average baseline and return the current one.
@@ -260,7 +244,6 @@ class HybridAgent:
         """
         baseline = self._baseline
         self._baseline_count += 1
-        # Incremental mean update
         self._baseline += (total_return - self._baseline) / self._baseline_count
         return baseline
 
@@ -308,7 +291,6 @@ class HybridAgent:
                   f"lr_q={lr_quantum}, lr_c={lr_classical}")
 
         for ep in range(episodes):
-            # Collect trajectory
             observations, actions, rewards, ep_len = self._collect_episode(env)
             total_reward = sum(rewards)
 
@@ -319,18 +301,15 @@ class HybridAgent:
                 result.best_reward = total_reward
                 result.best_episode = ep
 
-            # Compute discounted returns and advantage
             returns = self._compute_returns(rewards, self.gamma)
             baseline = self._update_baseline(total_reward)
             advantages = returns - baseline
 
-            # Normalise advantages
             if len(advantages) > 1:
                 adv_std = np.std(advantages)
                 if adv_std > 1e-8:
                     advantages = (advantages - np.mean(advantages)) / adv_std
 
-            # --- Policy gradient for quantum parameters ---
             q_grad = np.zeros_like(self.quantum_params)
             for t in range(len(observations)):
                 encoded = self._preprocess(observations[t])
@@ -340,19 +319,15 @@ class HybridAgent:
                 )
                 q_grad += step_grad
 
-            # Average gradient over timesteps
             q_grad /= len(observations)
 
-            # Update quantum parameters (gradient ascent on expected return)
             self.quantum_params += lr_quantum * q_grad
 
-            # --- Classical parameter update (finite-difference SGD) ---
             c_grad_W = np.zeros_like(self.classical_W)
             c_grad_b = np.zeros_like(self.classical_b)
 
             for i in range(self.n_qubits):
                 for j in range(self.obs_dim):
-                    # Perturb W[i, j]
                     self.classical_W[i, j] += epsilon
                     probs_plus = self._evaluate_episode_log_prob(
                         observations, actions
@@ -361,12 +336,11 @@ class HybridAgent:
                     probs_minus = self._evaluate_episode_log_prob(
                         observations, actions
                     )
-                    self.classical_W[i, j] += epsilon  # restore
+                    self.classical_W[i, j] += epsilon
 
                     grad = (probs_plus - probs_minus) / (2 * epsilon)
                     c_grad_W[i, j] = grad * np.mean(advantages)
 
-                # Perturb b[i]
                 self.classical_b[i] += epsilon
                 probs_plus = self._evaluate_episode_log_prob(
                     observations, actions
@@ -375,7 +349,7 @@ class HybridAgent:
                 probs_minus = self._evaluate_episode_log_prob(
                     observations, actions
                 )
-                self.classical_b[i] += epsilon  # restore
+                self.classical_b[i] += epsilon
 
                 grad = (probs_plus - probs_minus) / (2 * epsilon)
                 c_grad_b[i] = grad * np.mean(advantages)
@@ -383,7 +357,6 @@ class HybridAgent:
             self.classical_W += lr_classical * c_grad_W
             self.classical_b += lr_classical * c_grad_b
 
-            # Logging
             if verbose and (ep + 1) % print_every == 0:
                 recent = result.episode_rewards[-print_every:]
                 avg = np.mean(recent)
@@ -427,7 +400,6 @@ class HybridAgent:
             total_log_prob += np.log(probs[act] + 1e-15)
         return total_log_prob / len(observations)
 
-    # ----- evaluation ---------------------------------------------------- #
 
     def evaluate(
         self, env: Any, n_episodes: int = 10, verbose: bool = False
@@ -458,7 +430,6 @@ class HybridAgent:
             steps = 0
 
             while not done:
-                # Greedy: pick action with highest probability
                 probs = self.get_action_probs(obs)
                 action = int(np.argmax(probs))
                 obs, reward, done, _ = env.step(action)
@@ -480,7 +451,6 @@ class HybridAgent:
             "mean_length": float(np.mean(lengths)),
         }
 
-    # ----- serialisation ------------------------------------------------- #
 
     def save_params(self, filepath: str) -> None:
         """Save agent parameters to a JSON file.

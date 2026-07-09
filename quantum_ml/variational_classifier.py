@@ -36,7 +36,6 @@ class VariationalClassifier:
         Seed for reproducibility.
     """
 
-    # Fundamental gates
     I = np.eye(2, dtype=complex)
     H = np.array([[1, 1], [1, -1]], dtype=complex) / np.sqrt(2)
     X = np.array([[0, 1], [1, 0]], dtype=complex)
@@ -59,14 +58,10 @@ class VariationalClassifier:
         self.dim = 2 ** n_qubits
         self.rng = np.random.RandomState(random_state)
 
-        # 2 params per qubit per layer (RY + RZ) + 1 bias
         self.n_params = 2 * n_qubits * n_layers + 1
         self.params = self.rng.uniform(-np.pi, np.pi, self.n_params)
         self.training_history: list[float] = []
 
-    # ------------------------------------------------------------------
-    # Gate construction
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _kron_list(matrices: list[np.ndarray]) -> np.ndarray:
@@ -99,16 +94,12 @@ class VariationalClassifier:
         for k in range(self.dim):
             ctrl_bit = (k >> (n - 1 - control)) & 1
             if ctrl_bit:
-                # Flip target bit
                 flipped = k ^ (1 << (n - 1 - target))
                 new_state[flipped] += state[k]
             else:
                 new_state[k] += state[k]
         return new_state
 
-    # ------------------------------------------------------------------
-    # Circuit execution
-    # ------------------------------------------------------------------
 
     def _encode_data(self, x: np.ndarray) -> np.ndarray:
         """Angle-encode classical data into quantum state.
@@ -116,14 +107,12 @@ class VariationalClassifier:
         Applies RY(arctan(xᵢ)) · RZ(xᵢ) to qubit i.
         """
         state = np.zeros(self.dim, dtype=complex)
-        state[0] = 1.0  # |0...0⟩
+        state[0] = 1.0
 
-        # Hadamard layer
         for q in range(self.n_qubits):
             gate = self._apply_single_gate(self.H, q)
             state = gate @ state
 
-        # Encode features
         for q in range(self.n_qubits):
             idx = q % len(x)
             ry_gate = self._apply_single_gate(self._ry(np.arctan(x[idx])), q)
@@ -144,17 +133,14 @@ class VariationalClassifier:
         """
         n = self.n_qubits
 
-        # Rotation sub-layer
         for q in range(n):
             ry = self._apply_single_gate(self._ry(layer_params[2 * q]), q)
             rz = self._apply_single_gate(self._rz(layer_params[2 * q + 1]), q)
             state = rz @ ry @ state
 
-        # Entanglement sub-layer (linear connectivity)
         for q in range(n - 1):
             state = self._apply_cnot(q, q + 1, state)
 
-        # Ring closure
         if n > 2:
             state = self._apply_cnot(n - 1, 0, state)
 
@@ -180,7 +166,6 @@ class VariationalClassifier:
 
         state = self._encode_data(x)
 
-        # Apply variational layers
         params_per_layer = 2 * self.n_qubits
         for layer in range(self.n_layers):
             start = layer * params_per_layer
@@ -188,22 +173,17 @@ class VariationalClassifier:
             layer_params = params[start:end]
             state = self._variational_layer(state, layer_params)
 
-        # Measure ⟨Z₀⟩
         z0 = self._apply_single_gate(self.Z, 0)
         expectation = np.real(np.conj(state) @ z0 @ state)
 
-        # Apply bias
         bias = params[-1]
         return float(expectation + bias)
 
     def predict_proba(self, x: np.ndarray, params: Optional[np.ndarray] = None) -> float:
         """Return probability of class 1."""
         raw = self.forward(x, params)
-        return 1.0 / (1.0 + np.exp(-2 * raw))  # sigmoid mapping
+        return 1.0 / (1.0 + np.exp(-2 * raw))
 
-    # ------------------------------------------------------------------
-    # Training
-    # ------------------------------------------------------------------
 
     def _cost_function(self, params: np.ndarray, X: np.ndarray, y: np.ndarray) -> float:
         """Binary cross-entropy loss over the dataset."""

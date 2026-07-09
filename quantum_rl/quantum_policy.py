@@ -85,9 +85,6 @@ class QuantumPolicy:
             [0, 0, 1, 0],
         ], dtype=np.complex128)
 
-    # ------------------------------------------------------------------ #
-    #  Primitive gate constructors                                        #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def _ry(theta: float) -> np.ndarray:
@@ -158,11 +155,8 @@ class QuantumPolicy:
             Updated statevector.
         """
         n = self.n_qubits
-        # Reshape state into tensor of shape (2, 2, ..., 2)
         psi = state.reshape([2] * n)
-        # Apply gate on the target qubit axis
         psi = np.tensordot(gate, psi, axes=([1], [qubit]))
-        # Move the new axis back to the correct position
         psi = np.moveaxis(psi, 0, qubit)
         return psi.reshape(self.dim)
 
@@ -190,24 +184,18 @@ class QuantumPolicy:
         """
         n = self.n_qubits
         psi = state.reshape([2] * n)
-        # Extract the part where control qubit = 1
         idx_0 = [slice(None)] * n
         idx_1 = [slice(None)] * n
         idx_0[control] = 0
         idx_1[control] = 1
 
-        # Apply X gate to target qubit, conditioned on control = 1
         psi_1 = psi[tuple(idx_1)].copy()
         psi_1 = np.tensordot(self._X, psi_1, axes=([1], [target - (1 if target > control else 0)]))
-        # Adjust axis position
         target_ax = target - (1 if target > control else 0)
         psi_1 = np.moveaxis(psi_1, 0, target_ax)
         psi[tuple(idx_1)] = psi_1
         return psi.reshape(self.dim)
 
-    # ------------------------------------------------------------------ #
-    #  Circuit building blocks                                            #
-    # ------------------------------------------------------------------ #
 
     def encode_state(
         self, observation: np.ndarray, n_qubits: Optional[int] = None
@@ -233,12 +221,9 @@ class QuantumPolicy:
         if n_qubits is None:
             n_qubits = self.n_qubits
 
-        # Start from |0...0⟩
         state = np.zeros(self.dim, dtype=np.complex128)
         state[0] = 1.0
 
-        # Encode each observation feature as an RY rotation
-        # Use arctan to bound the angle to (-π/2, π/2)
         for i in range(min(len(observation), n_qubits)):
             angle = np.arctan(observation[i])
             gate = self._ry(angle)
@@ -274,14 +259,12 @@ class QuantumPolicy:
         if n_qubits is None:
             n_qubits = self.n_qubits
 
-        # Single-qubit rotations
         for i in range(n_qubits):
             ry_gate = self._ry(params[i])
             state = self._apply_single_qubit_gate(state, ry_gate, i)
             rz_gate = self._rz(params[n_qubits + i])
             state = self._apply_single_qubit_gate(state, rz_gate, i)
 
-        # CNOT entanglement ring
         if n_qubits > 1:
             for i in range(n_qubits):
                 control = i
@@ -311,10 +294,8 @@ class QuantumPolicy:
         np.ndarray
             Action probability distribution of shape (n_actions,).
         """
-        # Encode classical observation
         state = self.encode_state(observation)
 
-        # Apply variational layers
         params_per_layer = 2 * self.n_qubits
         for layer in range(self.n_layers):
             start = layer * params_per_layer
@@ -322,11 +303,8 @@ class QuantumPolicy:
             layer_params = params[start:end]
             state = self.variational_layer(state, layer_params)
 
-        # Measurement probabilities
         probs = np.abs(state) ** 2
 
-        # Map to action probabilities
-        # Group basis states into n_actions bins
         action_probs = np.zeros(self.n_actions)
         states_per_action = self.dim // self.n_actions
         remainder = self.dim % self.n_actions
@@ -337,7 +315,6 @@ class QuantumPolicy:
             action_probs[a] = np.sum(probs[idx : idx + count])
             idx += count
 
-        # Ensure valid probability distribution
         action_probs = np.clip(action_probs, 1e-10, None)
         action_probs /= action_probs.sum()
 
@@ -404,25 +381,20 @@ class QuantumPolicy:
         grad = np.zeros(n)
 
         for i in range(n):
-            # θ + ε·eᵢ
             params_plus = params.copy()
             params_plus[i] += epsilon
 
-            # θ - ε·eᵢ
             params_minus = params.copy()
             params_minus[i] -= epsilon
 
-            # Evaluate log-probabilities
             probs_plus = self.forward(observation, params_plus)
             probs_minus = self.forward(observation, params_minus)
 
             log_prob_plus = np.log(probs_plus[action] + 1e-15)
             log_prob_minus = np.log(probs_minus[action] + 1e-15)
 
-            # Central difference
             grad[i] = (log_prob_plus - log_prob_minus) / (2 * epsilon)
 
-        # Scale by reward (REINFORCE: ∇J = R · ∇log π)
         return reward * grad
 
     @staticmethod

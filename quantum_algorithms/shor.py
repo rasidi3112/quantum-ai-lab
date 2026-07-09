@@ -72,7 +72,6 @@ class ShorFactoring:
     def __init__(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(seed)
 
-    # ----- classical order finding (for verification) -----------------------
 
     @staticmethod
     def classical_order_check(a: int, N: int) -> int:
@@ -99,7 +98,6 @@ class ShorFactoring:
             r += 1
         return r if current == 1 else -1
 
-    # ----- QFT matrix -------------------------------------------------------
 
     @staticmethod
     def qft_matrix(n: int) -> np.ndarray:
@@ -124,7 +122,6 @@ class ShorFactoring:
         indices = np.arange(N)
         return np.power(omega, np.outer(indices, indices)) / np.sqrt(N)
 
-    # ----- controlled modular exponentiation --------------------------------
 
     @staticmethod
     def controlled_modular_exp(a: int, power: int, N: int,
@@ -151,16 +148,15 @@ class ShorFactoring:
         """
         dim = 2 ** n_qubits
         U = np.zeros((dim, dim), dtype=complex)
-        a_pow = pow(a, power, N)  # a^power mod N
+        a_pow = pow(a, power, N)
         for x in range(dim):
             if x < N:
                 y = (a_pow * x) % N
                 U[y, x] = 1.0
             else:
-                U[x, x] = 1.0  # identity for overflow states
+                U[x, x] = 1.0
         return U
 
-    # ----- quantum period finding -------------------------------------------
 
     def quantum_period_finding(self, a: int, N: int) -> int:
         """Simulate QPE-based period finding for ``a mod N``.
@@ -183,32 +179,16 @@ class ShorFactoring:
         int
             Estimated period *r*, or -1 on failure.
         """
-        # Register sizes
-        n_count = max(4, 2 * ceil(log2(N + 1)))  # precision qubits
-        n_work  = max(2, ceil(log2(N + 1)))       # work qubits
+        n_count = max(4, 2 * ceil(log2(N + 1)))
+        n_work  = max(2, ceil(log2(N + 1)))
         Q = 2 ** n_count
         dim_work = 2 ** n_work
 
-        # ---- Simulate the circuit on the work register ----
-        # Instead of building the full (n_count + n_work)-qubit state,
-        # we compute the state of the counting register analytically.
-        #
-        # After the controlled modular exponentiations and tracing out
-        # the work register, the counting register state is:
-        #
-        #   |ψ⟩ = (1/√Q) Σ_j  |j⟩  ⊗  U^j|1⟩
-        #
-        # Measuring the work register collapses the counting register
-        # into a superposition over j values consistent with the observed
-        # work state.  The inverse QFT then peaks at multiples of Q/r.
 
-        # Build the state of the full system (counting ⊗ work)
-        # For small N this is feasible.
         full_dim = Q * dim_work
         state = np.zeros(full_dim, dtype=complex)
 
         for j in range(Q):
-            # |j⟩ ⊗ U^j|1⟩
             work_state = np.zeros(dim_work, dtype=complex)
             val = pow(a, j, N)
             if val < dim_work:
@@ -219,7 +199,6 @@ class ShorFactoring:
 
         state /= np.linalg.norm(state)
 
-        # Measure the work register: pick a random outcome weighted by probs
         work_probs = np.zeros(dim_work)
         for w in range(dim_work):
             for j in range(Q):
@@ -228,7 +207,6 @@ class ShorFactoring:
 
         measured_work = self.rng.choice(dim_work, p=work_probs)
 
-        # Post-measurement counting-register state
         counting_state = np.zeros(Q, dtype=complex)
         for j in range(Q):
             counting_state[j] = state[j * dim_work + measured_work]
@@ -237,12 +215,10 @@ class ShorFactoring:
             return -1
         counting_state /= norm
 
-        # Apply inverse QFT
         qft_mat = self.qft_matrix(n_count)
         iqft_mat = qft_mat.conj().T
         counting_state = iqft_mat @ counting_state
 
-        # Measure the counting register
         probs = np.abs(counting_state) ** 2
         probs /= probs.sum()
         measured = int(self.rng.choice(Q, p=probs))
@@ -250,10 +226,8 @@ class ShorFactoring:
         if measured == 0:
             return -1
 
-        # Extract period via continued fractions
         return self.continued_fractions(measured, Q, N)
 
-    # ----- continued fractions ----------------------------------------------
 
     @staticmethod
     def continued_fractions(measured: int, Q: int, N: int) -> int:
@@ -280,7 +254,6 @@ class ShorFactoring:
         r = frac.denominator
         return r if r > 0 else -1
 
-    # ----- full factoring pipeline ------------------------------------------
 
     def factor(self, N: int, max_attempts: int = 20) -> ShorResult:
         """Factor *N* using Shor's algorithm.
@@ -298,7 +271,6 @@ class ShorFactoring:
         """
         result = ShorResult(N=N)
 
-        # Trivial checks
         if N <= 1:
             result.details.append(f"N={N} is ≤ 1, nothing to factor.")
             return result
@@ -308,7 +280,6 @@ class ShorFactoring:
             result.details.append(f"{N} is even → factors are 2 and {N // 2}.")
             return result
 
-        # Check if N is a prime power
         for base in range(2, int(N ** 0.5) + 1):
             power = 2
             while base ** power <= N:
@@ -335,7 +306,6 @@ class ShorFactoring:
                 result.details.append(f"  Lucky: gcd({a}, {N}) = {g}")
                 return result
 
-            # Quantum period finding
             r = self.quantum_period_finding(a, N)
             result.period_found = r
             result.details.append(f"  Quantum period finding → r = {r}")
@@ -344,9 +314,7 @@ class ShorFactoring:
                 result.details.append(f"  r={r} is odd or invalid, retrying.")
                 continue
 
-            # Also try multiples of r that might be the true period
             candidates = [r]
-            # Classical verification of small multiples
             for mult in [1, 2, 3]:
                 rc = r * mult
                 if pow(a, rc, N) == 1:

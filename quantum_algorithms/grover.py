@@ -60,7 +60,6 @@ class GroverSearch:
     >>> print(f"Found |{result.found_state}⟩ with P={result.found_probability:.4f}")
     """
 
-    # ----- oracle -----------------------------------------------------------
 
     @staticmethod
     def oracle(target: Union[int, List[int]], n_qubits: int) -> np.ndarray:
@@ -92,7 +91,6 @@ class GroverSearch:
             oracle_matrix[t, t] = -1.0
         return oracle_matrix
 
-    # ----- diffusion operator -----------------------------------------------
 
     @staticmethod
     def diffusion_operator(n_qubits: int) -> np.ndarray:
@@ -112,7 +110,6 @@ class GroverSearch:
         s = np.ones(N, dtype=complex) / sqrt(N)
         return 2.0 * np.outer(s, s.conj()) - np.eye(N, dtype=complex)
 
-    # ----- optimal iterations -----------------------------------------------
 
     @staticmethod
     def optimal_iterations(N: int, M: int = 1) -> int:
@@ -135,7 +132,6 @@ class GroverSearch:
         """
         return max(1, floor(pi / 4 * sqrt(N / M)))
 
-    # ----- single-target search ---------------------------------------------
 
     def search(self, n_qubits: int, target: int,
                n_iterations: Optional[int] = None) -> GroverResult:
@@ -157,15 +153,14 @@ class GroverSearch:
         if n_iterations is None:
             n_iterations = self.optimal_iterations(N, 1)
 
-        # Uniform superposition
         state = np.ones(N, dtype=complex) / sqrt(N)
 
         O = self.oracle(target, n_qubits)
         D = self.diffusion_operator(n_qubits)
 
         for _ in range(n_iterations):
-            state = O @ state        # oracle
-            state = D @ state        # diffusion
+            state = O @ state
+            state = D @ state
 
         probs = np.abs(state) ** 2
         found = int(np.argmax(probs))
@@ -180,7 +175,6 @@ class GroverSearch:
             success=(found == target),
         )
 
-    # ----- multi-target search ----------------------------------------------
 
     def multi_target_search(self, n_qubits: int,
                             targets: List[int],
@@ -226,7 +220,6 @@ class GroverSearch:
             success=(found in targets),
         )
 
-    # ----- amplitude amplification (generalised) ----------------------------
 
     def amplitude_amplification(self, initial_state: np.ndarray,
                                 oracle_matrix: np.ndarray,

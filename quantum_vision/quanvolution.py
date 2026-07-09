@@ -66,14 +66,10 @@ class Quanvolution:
         self.dim = 2 ** n_qubits
         self._rng = np.random.default_rng(seed)
 
-        # Pre-build gate matrices
         self._I = np.eye(2, dtype=np.complex128)
         self._X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
         self._Z = np.array([[1, 0], [0, -1]], dtype=np.complex128)
 
-    # ------------------------------------------------------------------ #
-    #  Gate primitives                                                    #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def _ry(theta: float) -> np.ndarray:
@@ -117,18 +113,12 @@ class Quanvolution:
         Maps result from [-1, 1] to [0, 1] for use as a feature.
         """
         psi = state.reshape([2] * self.n_qubits)
-        # Prob of qubit being |0⟩
         idx_0 = [slice(None)] * self.n_qubits
         idx_0[qubit] = 0
         p0 = np.sum(np.abs(psi[tuple(idx_0)]) ** 2)
-        # ⟨Z⟩ = p(0) - p(1) = 2*p(0) - 1
         z_exp = 2 * p0 - 1
-        # Map to [0, 1]
         return float((z_exp + 1) / 2)
 
-    # ------------------------------------------------------------------ #
-    #  Circuit execution                                                  #
-    # ------------------------------------------------------------------ #
 
     def _run_circuit(self, pixel_values: np.ndarray, params: np.ndarray) -> np.ndarray:
         """
@@ -146,38 +136,29 @@ class Quanvolution:
         np.ndarray
             Feature vector of shape (n_qubits,), values in [0, 1].
         """
-        # Initialize |0...0⟩
         state = np.zeros(self.dim, dtype=np.complex128)
         state[0] = 1.0
 
-        # Encode pixel values as RY rotations
         for i in range(min(len(pixel_values), self.n_qubits)):
             angle = np.pi * pixel_values[i]
             state = self._apply_gate(state, self._ry(angle), i)
 
-        # Apply variational layers
         params_per_layer = 2 * self.n_qubits
         for layer in range(self.n_layers):
             start = layer * params_per_layer
             layer_params = params[start : start + params_per_layer]
 
-            # RY-RZ rotations
             for i in range(self.n_qubits):
                 state = self._apply_gate(state, self._ry(layer_params[i]), i)
                 state = self._apply_gate(state, self._rz(layer_params[self.n_qubits + i]), i)
 
-            # CNOT ring
             if self.n_qubits > 1:
                 for i in range(self.n_qubits):
                     state = self._apply_cnot(state, i, (i + 1) % self.n_qubits)
 
-        # Measure: expectation of Z on each qubit → feature
         features = np.array([self._z_expectation(state, i) for i in range(self.n_qubits)])
         return features
 
-    # ------------------------------------------------------------------ #
-    #  Public API                                                         #
-    # ------------------------------------------------------------------ #
 
     def random_quantum_filter(
         self,
@@ -227,7 +208,6 @@ class Quanvolution:
         np.ndarray
             Feature vector of shape (n_qubits,).
         """
-        # Flatten patch to pixel vector
         pixels = patch.flatten()[:self.n_qubits]
         if len(pixels) < self.n_qubits:
             pixels = np.pad(pixels, (0, self.n_qubits - len(pixels)))

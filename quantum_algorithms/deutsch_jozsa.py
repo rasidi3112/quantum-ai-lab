@@ -48,7 +48,7 @@ import numpy as np
 @dataclass
 class DeutschJozsaResult:
     """Result of the Deutsch–Jozsa algorithm."""
-    oracle_type: str = ""              # "constant" or "balanced"
+    oracle_type: str = ""
     measurement_result: np.ndarray = field(default_factory=lambda: np.array([]))
     probabilities: np.ndarray = field(default_factory=lambda: np.array([]))
     n_qubits: int = 0
@@ -70,7 +70,6 @@ class DeutschJozsa:
     def __init__(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(seed)
 
-    # ----- oracle constructors ----------------------------------------------
 
     @staticmethod
     def constant_oracle(n_qubits: int, value: int = 0) -> np.ndarray:
@@ -90,11 +89,10 @@ class DeutschJozsa:
             acting on (n + 1) qubits.
         """
         N = 2 ** n_qubits
-        dim = 2 * N  # n+1 qubits
+        dim = 2 * N
         oracle = np.eye(dim, dtype=complex)
 
         if value == 1:
-            # f(x) = 1 for all x  →  flip ancilla for every |x⟩
             X_ancilla = np.array([[0, 1], [1, 0]], dtype=complex)
             oracle = np.kron(np.eye(N, dtype=complex), X_ancilla)
 
@@ -123,13 +121,10 @@ class DeutschJozsa:
         oracle = np.eye(dim, dtype=complex)
 
         for x in range(N):
-            # f(x) = popcount(x & pattern) mod 2
             fx = bin(x & pattern).count("1") % 2
             if fx == 1:
-                # Flip the ancilla qubit for input |x⟩
-                # |x,0⟩ ↔ |x,1⟩
-                idx0 = x * 2      # |x⟩ ⊗ |0⟩
-                idx1 = x * 2 + 1  # |x⟩ ⊗ |1⟩
+                idx0 = x * 2
+                idx1 = x * 2 + 1
                 oracle[idx0, idx0] = 0
                 oracle[idx1, idx1] = 0
                 oracle[idx0, idx1] = 1
@@ -162,7 +157,6 @@ class DeutschJozsa:
             pattern = int(self.rng.integers(1, 2 ** n_qubits))
             return self.balanced_oracle(n_qubits, pattern), "balanced"
 
-    # ----- run algorithm ----------------------------------------------------
 
     def run(self, oracle: np.ndarray, n_qubits: int) -> DeutschJozsaResult:
         """Run the Deutsch–Jozsa algorithm.
@@ -181,38 +175,31 @@ class DeutschJozsa:
         N = 2 ** n_qubits
         dim = 2 * N
 
-        # Step 1: Prepare |0⟩^⊗n ⊗ |1⟩
         state = np.zeros(dim, dtype=complex)
-        state[1] = 1.0  # |0...0⟩ ⊗ |1⟩
+        state[1] = 1.0
 
-        # Step 2: Apply H^⊗(n+1)
         H = np.array([[1, 1], [1, -1]], dtype=complex) / np.sqrt(2)
         H_full = np.array([[1]], dtype=complex)
         for _ in range(n_qubits + 1):
             H_full = np.kron(H_full, H)
         state = H_full @ state
 
-        # Step 3: Apply oracle
         state = oracle @ state
 
-        # Step 4: Apply H^⊗n to input register (not ancilla)
         H_input = np.array([[1]], dtype=complex)
         for _ in range(n_qubits):
             H_input = np.kron(H_input, H)
         H_with_ancilla = np.kron(H_input, np.eye(2, dtype=complex))
         state = H_with_ancilla @ state
 
-        # Step 5: Measure input register
-        # Compute probability of each input-register state (trace out ancilla)
         probs = np.zeros(N)
         for x in range(N):
-            amp0 = state[x * 2]      # |x⟩|0⟩
-            amp1 = state[x * 2 + 1]  # |x⟩|1⟩
+            amp0 = state[x * 2]
+            amp1 = state[x * 2 + 1]
             probs[x] = np.abs(amp0) ** 2 + np.abs(amp1) ** 2
 
-        probs /= probs.sum()  # normalise
+        probs /= probs.sum()
 
-        # If P(|0⟩^⊗n) ≈ 1 → constant, otherwise → balanced
         is_zero = probs[0] > 0.5
         oracle_type = "constant" if is_zero else "balanced"
 
@@ -224,7 +211,6 @@ class DeutschJozsa:
             is_zero_state=is_zero,
         )
 
-    # ----- classical verification -------------------------------------------
 
     @staticmethod
     def verify(oracle: np.ndarray, n_qubits: int) -> str:
@@ -245,13 +231,10 @@ class DeutschJozsa:
         """
         N = 2 ** n_qubits
 
-        # Evaluate f(x) for each x by checking if the oracle flips the ancilla
         f_values = []
         for x in range(N):
-            # Prepare |x⟩|0⟩
-            idx_in  = x * 2      # |x,0⟩
-            idx_out = x * 2 + 1  # |x,1⟩
-            # f(x) = 1 if oracle maps |x,0⟩ → |x,1⟩ component
+            idx_in  = x * 2
+            idx_out = x * 2 + 1
             fx = 1 if np.abs(oracle[idx_out, idx_in]) > 0.5 else 0
             f_values.append(fx)
 
