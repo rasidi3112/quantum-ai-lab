@@ -1,68 +1,8 @@
-"""
-Quantum Policy Network
-=======================
-
-Implements a variational quantum circuit (VQC) as a policy function for
-reinforcement learning. The circuit uses angle encoding for state input
-and parameterized rotation + entanglement layers for processing.
-
-Architecture:
-    |0⟩ ─── RY(x₀) ─── [RY(θ₀)─RZ(φ₀)] ─── ●─── ... ─── Measure
-    |0⟩ ─── RY(x₁) ─── [RY(θ₁)─RZ(φ₁)] ─── X─── ... ─── Measure
-    |0⟩ ─── RY(x₂) ─── [RY(θ₂)─RZ(φ₂)] ─── ●─── ... ─── Measure
-    |0⟩ ─── RY(x₃) ─── [RY(θ₃)─RZ(φ₃)] ─── X─── ... ─── Measure
-
-Each variational layer consists of:
-    1. Single-qubit RY(θ) and RZ(φ) rotations on each qubit
-    2. A ring of CNOT gates for entanglement: (0,1), (1,2), ..., (n-1,0)
-
-The measurement probabilities of the computational basis states are used
-to derive action probabilities for the RL agent.
-"""
-
 import numpy as np
 from typing import Optional, Tuple, List
 
 
 class QuantumPolicy:
-    """
-    Parameterized quantum circuit acting as a policy function.
-
-    The quantum policy maps classical observations to action probabilities
-    through a variational quantum circuit. The circuit parameters are
-    optimized using policy gradient methods.
-
-    Parameters
-    ----------
-    n_qubits : int
-        Number of qubits in the circuit.
-    n_layers : int
-        Number of variational layers.
-    n_actions : int
-        Number of discrete actions available.
-    seed : int, optional
-        Random seed for reproducibility.
-
-    Attributes
-    ----------
-    n_qubits : int
-        Number of qubits.
-    n_layers : int
-        Number of variational layers.
-    n_actions : int
-        Number of actions.
-    dim : int
-        Hilbert space dimension (2^n_qubits).
-
-    Examples
-    --------
-    >>> policy = QuantumPolicy(n_qubits=4, n_layers=2, n_actions=2)
-    >>> params = np.random.randn(policy.n_params(4, 2)) * 0.1
-    >>> obs = np.array([0.1, -0.2, 0.05, 0.3])
-    >>> probs = policy.forward(obs, params)
-    >>> action = policy.select_action(obs, params)
-    """
-
     def __init__(
         self,
         n_qubits: int = 4,
@@ -88,44 +28,12 @@ class QuantumPolicy:
 
     @staticmethod
     def _ry(theta: float) -> np.ndarray:
-        """
-        Single-qubit RY rotation gate.
-
-        RY(θ) = [[cos(θ/2), -sin(θ/2)],
-                  [sin(θ/2),  cos(θ/2)]]
-
-        Parameters
-        ----------
-        theta : float
-            Rotation angle in radians.
-
-        Returns
-        -------
-        np.ndarray
-            2×2 unitary matrix.
-        """
         c = np.cos(theta / 2)
         s = np.sin(theta / 2)
         return np.array([[c, -s], [s, c]], dtype=np.complex128)
 
     @staticmethod
     def _rz(phi: float) -> np.ndarray:
-        """
-        Single-qubit RZ rotation gate.
-
-        RZ(φ) = [[e^{-iφ/2}, 0],
-                  [0, e^{iφ/2}]]
-
-        Parameters
-        ----------
-        phi : float
-            Rotation angle in radians.
-
-        Returns
-        -------
-        np.ndarray
-            2×2 unitary matrix.
-        """
         return np.array([
             [np.exp(-1j * phi / 2), 0],
             [0, np.exp(1j * phi / 2)],
@@ -134,26 +42,6 @@ class QuantumPolicy:
     def _apply_single_qubit_gate(
         self, state: np.ndarray, gate: np.ndarray, qubit: int
     ) -> np.ndarray:
-        """
-        Apply a single-qubit gate to a specific qubit in the statevector.
-
-        Uses reshape-transpose-reshape trick for efficiency instead of
-        building the full 2^n × 2^n tensor product.
-
-        Parameters
-        ----------
-        state : np.ndarray
-            Statevector of shape (2^n,).
-        gate : np.ndarray
-            2×2 gate matrix.
-        qubit : int
-            Target qubit index (0-indexed).
-
-        Returns
-        -------
-        np.ndarray
-            Updated statevector.
-        """
         n = self.n_qubits
         psi = state.reshape([2] * n)
         psi = np.tensordot(gate, psi, axes=([1], [qubit]))
@@ -163,25 +51,6 @@ class QuantumPolicy:
     def _apply_cnot(
         self, state: np.ndarray, control: int, target: int
     ) -> np.ndarray:
-        """
-        Apply a CNOT gate between control and target qubits.
-
-        CNOT flips the target qubit if the control qubit is |1⟩.
-
-        Parameters
-        ----------
-        state : np.ndarray
-            Statevector of shape (2^n,).
-        control : int
-            Control qubit index.
-        target : int
-            Target qubit index.
-
-        Returns
-        -------
-        np.ndarray
-            Updated statevector.
-        """
         n = self.n_qubits
         psi = state.reshape([2] * n)
         idx_0 = [slice(None)] * n
@@ -200,24 +69,6 @@ class QuantumPolicy:
     def encode_state(
         self, observation: np.ndarray, n_qubits: Optional[int] = None
     ) -> np.ndarray:
-        """
-        Encode a classical observation into a quantum state via angle encoding.
-
-        Each observation feature is encoded as an RY rotation on a qubit:
-            |ψ⟩ = ∏ᵢ RY(arctan(xᵢ)) |0...0⟩
-
-        Parameters
-        ----------
-        observation : np.ndarray
-            Classical observation vector of shape (obs_dim,).
-        n_qubits : int, optional
-            Number of qubits to use. Defaults to self.n_qubits.
-
-        Returns
-        -------
-        np.ndarray
-            Encoded quantum state of shape (2^n_qubits,).
-        """
         if n_qubits is None:
             n_qubits = self.n_qubits
 
@@ -234,28 +85,6 @@ class QuantumPolicy:
     def variational_layer(
         self, state: np.ndarray, params: np.ndarray, n_qubits: Optional[int] = None
     ) -> np.ndarray:
-        """
-        Apply one variational layer: RY-RZ rotations + CNOT entanglement ring.
-
-        Layer structure:
-            1. For each qubit i: RY(θ_i) followed by RZ(φ_i)
-            2. CNOT ring: CNOT(0,1), CNOT(1,2), ..., CNOT(n-1,0)
-
-        Parameters
-        ----------
-        state : np.ndarray
-            Input quantum state of shape (2^n,).
-        params : np.ndarray
-            Layer parameters of shape (2 * n_qubits,).
-            First n_qubits values are RY angles, next n_qubits are RZ angles.
-        n_qubits : int, optional
-            Number of qubits. Defaults to self.n_qubits.
-
-        Returns
-        -------
-        np.ndarray
-            Updated quantum state.
-        """
         if n_qubits is None:
             n_qubits = self.n_qubits
 
@@ -276,24 +105,6 @@ class QuantumPolicy:
     def forward(
         self, observation: np.ndarray, params: np.ndarray
     ) -> np.ndarray:
-        """
-        Full quantum circuit execution: encoding → variational layers → measurement.
-
-        The output is a probability distribution over computational basis states,
-        reduced to action probabilities by grouping/summing.
-
-        Parameters
-        ----------
-        observation : np.ndarray
-            Classical observation vector.
-        params : np.ndarray
-            All variational parameters, shape (n_layers * 2 * n_qubits,).
-
-        Returns
-        -------
-        np.ndarray
-            Action probability distribution of shape (n_actions,).
-        """
         state = self.encode_state(observation)
 
         params_per_layer = 2 * self.n_qubits
@@ -323,21 +134,6 @@ class QuantumPolicy:
     def select_action(
         self, observation: np.ndarray, params: np.ndarray
     ) -> int:
-        """
-        Sample an action from the policy's output distribution.
-
-        Parameters
-        ----------
-        observation : np.ndarray
-            Classical observation vector.
-        params : np.ndarray
-            Variational circuit parameters.
-
-        Returns
-        -------
-        int
-            Selected action index.
-        """
         probs = self.forward(observation, params)
         action = self._rng.choice(self.n_actions, p=probs)
         return int(action)
@@ -350,33 +146,6 @@ class QuantumPolicy:
         params: np.ndarray,
         epsilon: float = 1e-3,
     ) -> np.ndarray:
-        """
-        Compute policy gradient via finite-difference approximation.
-
-        For each parameter θᵢ:
-            ∂log π(a|s;θ) / ∂θᵢ ≈ [log π(a|s;θ+εeᵢ) - log π(a|s;θ-εeᵢ)] / (2ε)
-
-        The gradient of the expected return J(θ) is:
-            ∇J(θ) = E[R · ∇log π(a|s;θ)]
-
-        Parameters
-        ----------
-        observation : np.ndarray
-            Classical observation.
-        action : int
-            Action taken.
-        reward : float
-            Reward signal (typically discounted return).
-        params : np.ndarray
-            Current circuit parameters.
-        epsilon : float
-            Finite-difference step size.
-
-        Returns
-        -------
-        np.ndarray
-            Gradient vector of shape (n_params,).
-        """
         n = len(params)
         grad = np.zeros(n)
 
@@ -399,38 +168,8 @@ class QuantumPolicy:
 
     @staticmethod
     def n_params(n_qubits: int, n_layers: int) -> int:
-        """
-        Compute total number of trainable parameters.
-
-        Each layer has 2 parameters per qubit (RY + RZ angles).
-
-        Parameters
-        ----------
-        n_qubits : int
-            Number of qubits.
-        n_layers : int
-            Number of variational layers.
-
-        Returns
-        -------
-        int
-            Total parameter count = n_layers × 2 × n_qubits.
-        """
         return n_layers * 2 * n_qubits
 
     def init_params(self, scale: float = 0.1) -> np.ndarray:
-        """
-        Initialize random circuit parameters.
-
-        Parameters
-        ----------
-        scale : float
-            Standard deviation of the normal distribution.
-
-        Returns
-        -------
-        np.ndarray
-            Random parameter vector.
-        """
         n = self.n_params(self.n_qubits, self.n_layers)
         return self._rng.normal(0, scale, size=n)

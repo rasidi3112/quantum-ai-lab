@@ -1,34 +1,3 @@
-"""
-Quantum Fourier Transform (QFT) & Phase Estimation
-===================================================
-
-The QFT is the quantum analogue of the discrete Fourier transform and sits
-at the heart of many quantum algorithms (Shor's factoring, phase estimation,
-quantum counting, etc.).
-
-QFT definition
---------------
-For an *n*-qubit register with ``N = 2^n`` basis states:
-
-.. math::
-
-    \\text{QFT} |j\\rangle = \\frac{1}{\\sqrt{N}}
-    \\sum_{k=0}^{N-1} \\omega^{jk} |k\\rangle,
-    \\quad \\omega = e^{2\\pi i / N}
-
-Gate decomposition
-------------------
-The QFT can be decomposed into ``n(n-1)/2`` controlled-phase gates plus
-``n`` Hadamard gates, giving an overall gate count of ``O(n²)`` — an
-exponential improvement over the classical FFT's ``O(N log N)``.
-
-Phase estimation
-----------------
-Given a unitary *U* with eigenstate ``|u⟩`` and unknown eigenvalue
-``e^{2πiφ}``, quantum phase estimation uses *t* ancilla qubits to
-approximate *φ* to *t* bits of precision with high probability.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -40,7 +9,6 @@ import numpy as np
 
 @dataclass
 class PhaseEstimationResult:
-    """Result of quantum phase estimation."""
     estimated_phase: float
     n_precision_bits: int
     measurement_outcome: int
@@ -49,37 +17,9 @@ class PhaseEstimationResult:
 
 
 class QFT:
-    """Quantum Fourier Transform utilities and phase estimation.
-
-    All operations are implemented as NumPy matrix algebra on complex
-    statevectors.
-
-    Examples
-    --------
-    >>> qft = QFT()
-    >>> state = np.array([1, 0, 0, 0], dtype=complex)  # |00⟩
-    >>> transformed = qft.apply_qft(state)
-    >>> print(np.abs(transformed)**2)   # uniform distribution
-    """
-
 
     @staticmethod
     def qft_matrix(n_qubits: int) -> np.ndarray:
-        """Construct the n-qubit QFT unitary matrix.
-
-        .. math::
-
-            (\\text{QFT})_{jk} = \\frac{1}{\\sqrt{N}} e^{2\\pi i \\, jk / N}
-
-        Parameters
-        ----------
-        n_qubits : int
-            Number of qubits.
-
-        Returns
-        -------
-        np.ndarray, shape ``(N, N)``
-        """
         N = 2 ** n_qubits
         omega = np.exp(2j * np.pi / N)
         indices = np.arange(N)
@@ -88,18 +28,6 @@ class QFT:
 
     @staticmethod
     def iqft_matrix(n_qubits: int) -> np.ndarray:
-        """Construct the inverse QFT unitary matrix.
-
-        ``QFT†`` is simply the conjugate transpose of QFT.
-
-        Parameters
-        ----------
-        n_qubits : int
-
-        Returns
-        -------
-        np.ndarray, shape ``(N, N)``
-        """
         N = 2 ** n_qubits
         omega = np.exp(-2j * np.pi / N)
         indices = np.arange(N)
@@ -107,34 +35,12 @@ class QFT:
 
 
     def apply_qft(self, state: np.ndarray) -> np.ndarray:
-        """Apply the QFT to a statevector.
-
-        Parameters
-        ----------
-        state : np.ndarray
-            Complex statevector of length ``2**n``.
-
-        Returns
-        -------
-        np.ndarray
-            Transformed statevector.
-        """
         n = int(np.log2(len(state)))
         assert 2 ** n == len(state), "State length must be a power of 2."
         F = self.qft_matrix(n)
         return F @ state
 
     def apply_iqft(self, state: np.ndarray) -> np.ndarray:
-        """Apply the inverse QFT to a statevector.
-
-        Parameters
-        ----------
-        state : np.ndarray
-
-        Returns
-        -------
-        np.ndarray
-        """
         n = int(np.log2(len(state)))
         assert 2 ** n == len(state), "State length must be a power of 2."
         F_inv = self.iqft_matrix(n)
@@ -144,21 +50,6 @@ class QFT:
     @staticmethod
     def qft_single_qubit_gates(n_qubits: int
                                 ) -> List[Tuple[str, ...]]:
-        """Decompose the QFT into Hadamard and controlled-phase gates.
-
-        Returns a list of gate instructions, each a tuple:
-        - ``('H', qubit)`` – Hadamard on *qubit*
-        - ``('CP', control, target, angle)`` – controlled phase
-        - ``('SWAP', q1, q2)`` – swap qubits
-
-        Parameters
-        ----------
-        n_qubits : int
-
-        Returns
-        -------
-        list of tuples
-        """
         gates: List[Tuple] = []
         for i in range(n_qubits):
             gates.append(("H", i))
@@ -179,7 +70,6 @@ class QFT:
     @staticmethod
     def _controlled_phase(n_qubits: int, control: int, target: int,
                           angle: float) -> np.ndarray:
-        """Build the full n-qubit controlled-phase gate matrix."""
         N = 2 ** n_qubits
         gate = np.eye(N, dtype=complex)
         for state in range(N):
@@ -189,18 +79,6 @@ class QFT:
         return gate
 
     def qft_from_gates(self, n_qubits: int) -> np.ndarray:
-        """Build the QFT unitary by composing individual gates.
-
-        Useful for educational comparison with the direct matrix.
-
-        Parameters
-        ----------
-        n_qubits : int
-
-        Returns
-        -------
-        np.ndarray, shape ``(N, N)``
-        """
         N = 2 ** n_qubits
         U = np.eye(N, dtype=complex)
         H = self._hadamard()
@@ -245,33 +123,6 @@ class QFT:
                          n_precision: int = 4,
                          seed: Optional[int] = None
                          ) -> PhaseEstimationResult:
-        """Quantum phase estimation (QPE).
-
-        Given a unitary *U* and one of its eigenstates ``|u⟩`` with
-        ``U|u⟩ = e^{2πiφ}|u⟩``, estimate φ to *n_precision* bits.
-
-        Algorithm:
-        1. Prepare ``|0⟩^{⊗t} ⊗ |u⟩`` where t = n_precision.
-        2. Apply ``H^{⊗t}`` to the ancilla register.
-        3. Apply controlled-``U^{2^k}`` for each ancilla qubit k.
-        4. Apply inverse QFT to the ancilla.
-        5. Measure the ancilla → binary approximation of φ.
-
-        Parameters
-        ----------
-        unitary : np.ndarray
-            The unitary matrix (shape ``(M, M)``).
-        eigenstate : np.ndarray
-            An eigenstate of *unitary* (length ``M``).
-        n_precision : int
-            Number of precision qubits.
-        seed : int | None
-            For reproducible measurement.
-
-        Returns
-        -------
-        PhaseEstimationResult
-        """
         rng = np.random.default_rng(seed)
         M = len(eigenstate)
         n_eigen = int(np.log2(M))

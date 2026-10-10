@@ -1,41 +1,8 @@
-"""
-Quantum Neural Network (QNN)
-============================
-
-Implements a parameterized quantum neural network layer that can serve
-as a drop-in replacement for classical neural network layers.
-
-Architecture:
-    Input → Encoding → [Variational Layer]×L → Measurement → Output
-
-Encoding strategies:
-    - Amplitude encoding: |ψ⟩ = Σ xᵢ|i⟩ / ‖x‖
-    - Angle encoding: RY(xᵢ) on qubit i
-
-References:
-    Farhi, E., & Neven, H. (2018). Classification with quantum neural networks
-    on near term processors. arXiv:1802.06002.
-"""
-
 import numpy as np
 from typing import Optional, Literal
 
 
 class QuantumNeuralNetwork:
-    """Quantum Neural Network layer for hybrid models.
-
-    Parameters
-    ----------
-    n_qubits : int
-        Number of qubits.
-    n_layers : int
-        Number of variational layers.
-    encoding : str
-        Data encoding strategy: 'amplitude' or 'angle'.
-    measurement : str
-        Measurement strategy: 'expval' (expectation values) or 'probs' (probabilities).
-    """
-
     I = np.eye(2, dtype=complex)
     H = np.array([[1, 1], [1, -1]], dtype=complex) / np.sqrt(2)
     X = np.array([[0, 1], [1, 0]], dtype=complex)
@@ -102,12 +69,6 @@ class QuantumNeuralNetwork:
 
 
     def amplitude_encoding(self, x: np.ndarray) -> np.ndarray:
-        """Encode data vector into quantum state amplitudes.
-
-        |ψ⟩ = Σᵢ xᵢ|i⟩ / ‖x‖
-
-        The input is zero-padded to 2^n_qubits if necessary.
-        """
         state = np.zeros(self.dim, dtype=complex)
         n = min(len(x), self.dim)
         state[:n] = x[:n]
@@ -121,10 +82,6 @@ class QuantumNeuralNetwork:
         return state
 
     def angle_encoding(self, x: np.ndarray) -> np.ndarray:
-        """Encode data as rotation angles: RY(xᵢ) applied to |0⟩ state.
-
-        Each feature xᵢ is mapped to a rotation on qubit i.
-        """
         state = np.zeros(self.dim, dtype=complex)
         state[0] = 1.0
 
@@ -135,7 +92,6 @@ class QuantumNeuralNetwork:
         return state
 
     def encode(self, x: np.ndarray) -> np.ndarray:
-        """Encode input data using the configured strategy."""
         if self.encoding == "amplitude":
             return self.amplitude_encoding(x)
         else:
@@ -145,10 +101,6 @@ class QuantumNeuralNetwork:
     def _variational_layer(
         self, state: np.ndarray, params: np.ndarray
     ) -> np.ndarray:
-        """Apply one variational layer: RX-RY-RZ rotations + CNOT entanglement.
-
-        params shape: (3 * n_qubits,) → [rx0, ry0, rz0, rx1, ry1, rz1, ...]
-        """
         n = self.n_qubits
 
         for q in range(n):
@@ -165,7 +117,6 @@ class QuantumNeuralNetwork:
 
 
     def _measure_expval(self, state: np.ndarray) -> np.ndarray:
-        """Measure expectation value ⟨Zᵢ⟩ for each qubit."""
         expectations = np.zeros(self.n_qubits)
         for q in range(self.n_qubits):
             z_full = self._kron_list(
@@ -175,7 +126,6 @@ class QuantumNeuralNetwork:
         return expectations
 
     def _measure_probs(self, state: np.ndarray) -> np.ndarray:
-        """Return measurement probabilities |⟨i|ψ⟩|² for all basis states."""
         return np.abs(state) ** 2
 
 
@@ -184,20 +134,6 @@ class QuantumNeuralNetwork:
         x: np.ndarray,
         weights: Optional[np.ndarray] = None,
     ) -> np.ndarray:
-        """Full forward pass: encode → variational layers → measure.
-
-        Parameters
-        ----------
-        x : np.ndarray
-            Input feature vector.
-        weights : np.ndarray, optional
-            Circuit weights. Uses self.weights if None.
-
-        Returns
-        -------
-        np.ndarray
-            Output vector (expectation values or probabilities).
-        """
         if weights is None:
             weights = self.weights
 
@@ -220,15 +156,6 @@ class QuantumNeuralNetwork:
         weights: Optional[np.ndarray] = None,
         shift: float = np.pi / 2,
     ) -> np.ndarray:
-        """Compute gradient via parameter-shift rule.
-
-        ∂f/∂θᵢ = [f(θᵢ + π/2) - f(θᵢ - π/2)] / 2
-
-        Returns
-        -------
-        np.ndarray
-            Gradient of shape (n_params, n_outputs).
-        """
         if weights is None:
             weights = self.weights.copy()
 

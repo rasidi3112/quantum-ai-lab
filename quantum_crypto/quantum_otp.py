@@ -1,32 +1,3 @@
-"""
-Quantum One-Time Pad (Quantum OTP)
-==================================
-
-Combines quantum key distribution (BB84 or E91) with the classical one-time
-pad (OTP) cipher to achieve *information-theoretic* security.
-
-Security guarantee
-------------------
-Shannon proved (1949) that the OTP is perfectly secret when:
-
-1. The key is at least as long as the message.
-2. The key is truly random.
-3. The key is used only once.
-
-QKD provides condition (2) via the laws of quantum mechanics, while the
-protocol enforces (3) by generating a fresh key for every message.
-
-Encryption / Decryption
------------------------
-Both operations are simply bitwise XOR:
-
-.. math::
-
-    c_i = m_i \\oplus k_i \\qquad m_i = c_i \\oplus k_i
-
-where *m* is the plaintext, *k* the key, and *c* the ciphertext.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -40,7 +11,6 @@ from quantum_crypto.e91 import E91Protocol
 
 @dataclass
 class CommunicationResult:
-    """Result container for a full secure-communication pipeline."""
     plaintext: str
     ciphertext_bits: np.ndarray
     decrypted_text: str
@@ -52,39 +22,12 @@ class CommunicationResult:
 
 
 class QuantumOTP:
-    """Quantum One-Time Pad: QKD + classical OTP encryption.
-
-    Parameters
-    ----------
-    seed : int | None
-        Random seed for reproducibility.
-
-    Examples
-    --------
-    >>> otp = QuantumOTP(seed=42)
-    >>> result = otp.secure_communicate("Hello!")
-    >>> print(result.decrypted_text)
-    Hello!
-    """
-
     def __init__(self, seed: Optional[int] = None) -> None:
         self.seed = seed
 
 
     @staticmethod
     def encode_message(text: str) -> np.ndarray:
-        """Convert a text string to a binary (bit) array.
-
-        Each character is encoded as 8-bit ASCII.
-
-        Parameters
-        ----------
-        text : str
-
-        Returns
-        -------
-        np.ndarray of int, shape ``(8 * len(text),)``
-        """
         bits = []
         for ch in text:
             byte = format(ord(ch), "08b")
@@ -93,17 +36,6 @@ class QuantumOTP:
 
     @staticmethod
     def decode_message(binary: np.ndarray) -> str:
-        """Convert a binary (bit) array back to a text string.
-
-        Parameters
-        ----------
-        binary : array-like of int
-            Length must be a multiple of 8.
-
-        Returns
-        -------
-        str
-        """
         binary = np.asarray(binary, dtype=int)
         chars = []
         for i in range(0, len(binary), 8):
@@ -118,24 +50,6 @@ class QuantumOTP:
     @staticmethod
     def encrypt(message_bits: np.ndarray,
                 quantum_key: np.ndarray) -> np.ndarray:
-        """Encrypt binary message with a quantum-derived key (XOR).
-
-        Parameters
-        ----------
-        message_bits : np.ndarray of int
-        quantum_key : np.ndarray of int
-            Must be at least as long as *message_bits*.
-
-        Returns
-        -------
-        np.ndarray of int
-            The ciphertext bits.
-
-        Raises
-        ------
-        ValueError
-            If the key is shorter than the message.
-        """
         if len(quantum_key) < len(message_bits):
             raise ValueError(
                 f"Key length ({len(quantum_key)}) < message length "
@@ -146,43 +60,12 @@ class QuantumOTP:
     @staticmethod
     def decrypt(ciphertext: np.ndarray,
                 quantum_key: np.ndarray) -> np.ndarray:
-        """Decrypt ciphertext with the same quantum key (XOR).
-
-        Parameters
-        ----------
-        ciphertext : np.ndarray of int
-        quantum_key : np.ndarray of int
-
-        Returns
-        -------
-        np.ndarray of int
-            The plaintext bits.
-        """
         return np.bitwise_xor(ciphertext, quantum_key[:len(ciphertext)])
 
 
     def secure_communicate(self, message: str,
                            protocol: str = "bb84"
                            ) -> CommunicationResult:
-        """End-to-end secure communication pipeline.
-
-        1. Encode the plaintext to binary.
-        2. Generate a quantum key via the chosen QKD protocol.
-        3. Encrypt with XOR.
-        4. Decrypt with XOR.
-        5. Verify integrity.
-
-        Parameters
-        ----------
-        message : str
-            The plaintext message to send securely.
-        protocol : str
-            ``'bb84'`` or ``'e91'``.
-
-        Returns
-        -------
-        CommunicationResult
-        """
         message_bits = self.encode_message(message)
         needed = len(message_bits)
 

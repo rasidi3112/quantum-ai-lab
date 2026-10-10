@@ -1,37 +1,3 @@
-"""
-Hybrid Classical-Quantum Reinforcement Learning Agent
-======================================================
-
-Implements a hybrid RL agent that combines a classical preprocessing layer
-with a variational quantum circuit (VQC) for policy decisions.  Training
-uses the REINFORCE (Monte-Carlo policy gradient) algorithm.
-
-Architecture::
-
-    Classical                   Quantum                    Classical
-    ┌──────────┐   angles   ┌──────────────┐   probs   ┌──────────┐
-    │  Linear  │ ────────→ │ QuantumPolicy │ ───────→ │ Softmax  │ → action
-    │ W·obs+b  │           │  VQC circuit  │           │          │
-    └──────────┘           └──────────────┘           └──────────┘
-
-The classical linear layer maps raw observations to rotation angles
-(dimensionality reduction if obs_dim > n_qubits).  The quantum policy
-circuit produces action probabilities, which are normalised via softmax.
-
-Training procedure (REINFORCE with baseline):
-    1. Collect full episode trajectory τ = {(s_t, a_t, r_t)}
-    2. Compute discounted returns G_t = Σ_{k=0}^{T-t} γ^k · r_{t+k}
-    3. Compute advantage: A_t = G_t − baseline  (baseline = running mean)
-    4. Update quantum params via finite-difference policy gradient
-    5. Update classical params via vanilla SGD
-
-References
-----------
-- Jerbi et al., "Parametrized quantum policies for reinforcement learning" (2021)
-- Skolik et al., "Quantum agents in the Gym" (2022)
-- Lockwood & Si, "Reinforcement Learning with Quantum Variational Circuits" (2020)
-"""
-
 from __future__ import annotations
 
 import json
@@ -46,7 +12,6 @@ from quantum_rl.quantum_policy import QuantumPolicy
 
 @dataclass
 class TrainingResult:
-    """Container for training diagnostics."""
     episode_rewards: List[float] = field(default_factory=list)
     episode_lengths: List[int] = field(default_factory=list)
     best_reward: float = float("-inf")
@@ -56,38 +21,6 @@ class TrainingResult:
 
 
 class HybridAgent:
-    """Hybrid classical-quantum reinforcement learning agent.
-
-    The agent uses a classical linear layer for observation preprocessing
-    followed by a QuantumPolicy circuit for action selection.  Training
-    uses the REINFORCE algorithm with a moving-average baseline for
-    variance reduction.
-
-    Parameters
-    ----------
-    n_qubits : int
-        Number of qubits in the quantum policy circuit.
-    n_layers : int
-        Number of variational layers in the circuit.
-    n_actions : int
-        Number of discrete actions.
-    obs_dim : int
-        Dimensionality of the observation vector.
-    gamma : float
-        Discount factor for returns.
-    seed : int | None
-        Random seed for reproducibility.
-
-    Attributes
-    ----------
-    quantum_params : np.ndarray
-        Trainable parameters of the variational quantum circuit.
-    classical_W : np.ndarray
-        Weight matrix of the classical linear layer (n_qubits × obs_dim).
-    classical_b : np.ndarray
-        Bias vector of the classical linear layer (n_qubits,).
-    """
-
     def __init__(
         self,
         n_qubits: int = 4,
@@ -123,47 +56,15 @@ class HybridAgent:
 
 
     def _preprocess(self, observation: np.ndarray) -> np.ndarray:
-        """Classical linear layer: obs → encoded angles.
-
-        Parameters
-        ----------
-        observation : np.ndarray, shape ``(obs_dim,)``
-
-        Returns
-        -------
-        np.ndarray, shape ``(n_qubits,)``
-            Encoded angles to feed into the quantum circuit.
-        """
         return np.tanh(self.classical_W @ observation + self.classical_b)
 
     def get_action_probs(
         self, observation: np.ndarray
     ) -> np.ndarray:
-        """Compute action probability distribution.
-
-        Parameters
-        ----------
-        observation : np.ndarray
-
-        Returns
-        -------
-        np.ndarray, shape ``(n_actions,)``
-        """
         encoded = self._preprocess(observation)
         return self.policy.forward(encoded, self.quantum_params)
 
     def select_action(self, observation: np.ndarray) -> int:
-        """Sample an action from the current policy.
-
-        Parameters
-        ----------
-        observation : np.ndarray
-
-        Returns
-        -------
-        int
-            Selected action index.
-        """
         probs = self.get_action_probs(observation)
         return int(self._rng.choice(self.n_actions, p=probs))
 
@@ -172,20 +73,6 @@ class HybridAgent:
     def _compute_returns(
         rewards: List[float], gamma: float
     ) -> np.ndarray:
-        """Compute discounted returns G_t = Σ γ^k r_{t+k}.
-
-        Parameters
-        ----------
-        rewards : list of float
-            Episode rewards [r_0, r_1, ..., r_T].
-        gamma : float
-            Discount factor.
-
-        Returns
-        -------
-        np.ndarray
-            Discounted returns aligned with each timestep.
-        """
         T = len(rewards)
         returns = np.zeros(T)
         G = 0.0
@@ -200,18 +87,6 @@ class HybridAgent:
         List[float],
         int,
     ]:
-        """Run a single episode and collect the trajectory.
-
-        Parameters
-        ----------
-        env
-            Environment with ``reset()`` and ``step(action)`` methods.
-
-        Returns
-        -------
-        tuple
-            (observations, actions, rewards, episode_length)
-        """
         observations: List[np.ndarray] = []
         actions: List[int] = []
         rewards: List[float] = []
@@ -230,18 +105,6 @@ class HybridAgent:
 
 
     def _update_baseline(self, total_return: float) -> float:
-        """Update running-average baseline and return the current one.
-
-        Parameters
-        ----------
-        total_return : float
-            Undiscounted total reward of the episode.
-
-        Returns
-        -------
-        float
-            Current baseline value (before update).
-        """
         baseline = self._baseline
         self._baseline_count += 1
         self._baseline += (total_return - self._baseline) / self._baseline_count
@@ -257,30 +120,6 @@ class HybridAgent:
         verbose: bool = True,
         print_every: int = 20,
     ) -> TrainingResult:
-        """Train the hybrid agent using REINFORCE.
-
-        Parameters
-        ----------
-        env
-            RL environment with ``reset()`` and ``step(action)`` methods.
-        episodes : int
-            Number of training episodes.
-        lr_quantum : float
-            Learning rate for quantum circuit parameters.
-        lr_classical : float
-            Learning rate for classical layer parameters.
-        epsilon : float
-            Finite-difference step size for policy gradient.
-        verbose : bool
-            Print training progress.
-        print_every : int
-            Print frequency (episodes).
-
-        Returns
-        -------
-        TrainingResult
-            Training diagnostics including reward history.
-        """
         result = TrainingResult()
 
         if verbose:
@@ -382,18 +221,6 @@ class HybridAgent:
         observations: List[np.ndarray],
         actions: List[int],
     ) -> float:
-        """Compute mean log-probability of actions under current policy.
-
-        Parameters
-        ----------
-        observations : list of np.ndarray
-        actions : list of int
-
-        Returns
-        -------
-        float
-            Mean log π(a_t | s_t).
-        """
         total_log_prob = 0.0
         for obs, act in zip(observations, actions):
             probs = self.get_action_probs(obs)
@@ -404,22 +231,6 @@ class HybridAgent:
     def evaluate(
         self, env: Any, n_episodes: int = 10, verbose: bool = False
     ) -> Dict[str, float]:
-        """Evaluate the agent's performance (greedy policy).
-
-        Parameters
-        ----------
-        env
-            Environment to evaluate in.
-        n_episodes : int
-            Number of evaluation episodes.
-        verbose : bool
-            Print per-episode results.
-
-        Returns
-        -------
-        dict
-            Statistics including mean_reward, std_reward, mean_length.
-        """
         rewards = []
         lengths = []
 
@@ -453,13 +264,6 @@ class HybridAgent:
 
 
     def save_params(self, filepath: str) -> None:
-        """Save agent parameters to a JSON file.
-
-        Parameters
-        ----------
-        filepath : str
-            Path to save the parameter file.
-        """
         data = {
             "n_qubits": self.n_qubits,
             "n_layers": self.n_layers,
@@ -475,13 +279,6 @@ class HybridAgent:
         Path(filepath).write_text(json.dumps(data, indent=2))
 
     def load_params(self, filepath: str) -> None:
-        """Load agent parameters from a JSON file.
-
-        Parameters
-        ----------
-        filepath : str
-            Path to the saved parameter file.
-        """
         data = json.loads(Path(filepath).read_text())
         self.quantum_params = np.array(data["quantum_params"])
         self.classical_W = np.array(data["classical_W"])

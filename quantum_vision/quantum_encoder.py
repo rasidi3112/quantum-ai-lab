@@ -1,94 +1,14 @@
-"""
-Quantum Image Encoding Schemes
-================================
-
-Implements several methods for encoding classical image data into quantum
-states, enabling quantum processing of visual information.
-
-Encoding methods:
-    1. Amplitude Encoding: |ψ⟩ = Σ xᵢ|i⟩ / ||x||
-       - Most compact: log₂(N) qubits for N pixels
-       - Requires state preparation circuit
-
-    2. Angle Encoding: ∏ᵢ RY(f(xᵢ))|0⟩
-       - One qubit per feature
-       - Simple circuit implementation
-
-    3. Threshold (Binary) Encoding: |b₁b₂...bₙ⟩
-       - Binary thresholding of pixel values
-       - Simplest encoding
-
-    4. FRQI (Flexible Representation of Quantum Images):
-       - |I⟩ = (1/√N) Σᵢ (cos θᵢ|0⟩ + sin θᵢ|1⟩) ⊗ |i⟩
-       - Encodes pixel intensities as rotation angles
-       - log₂(N) + 1 qubits for N pixels
-
-    5. NEQR (Novel Enhanced Quantum Representation):
-       - Uses basis states to encode pixel gray levels
-       - Better measurement retrieval than FRQI
-       - log₂(N) + q qubits for N pixels with 2^q gray levels
-
-References:
-    - Le et al., "A Flexible Representation of Quantum Images" (2011)
-    - Zhang et al., "NEQR: A Novel Enhanced Quantum Representation" (2013)
-    - Schuld & Petruccione, "Supervised Learning with Quantum Computers" (2018)
-"""
-
 import numpy as np
 from typing import Optional, Tuple
 
 
 class QuantumEncoder:
-    """
-    Quantum image encoding with multiple strategies.
-
-    Provides methods to encode classical image data into quantum states
-    and decode quantum states back into classical images.
-
-    Parameters
-    ----------
-    n_qubits : int, optional
-        Default number of qubits for angle encoding.
-
-    Examples
-    --------
-    >>> encoder = QuantumEncoder()
-    >>> image = np.random.rand(4, 4)
-    >>> state = encoder.amplitude_encoding(image)
-    >>> recovered = encoder.decode_amplitude(state, (4, 4))
-    """
-
     def __init__(self, n_qubits: Optional[int] = None):
         self.n_qubits = n_qubits
 
 
     @staticmethod
     def amplitude_encoding(image: np.ndarray) -> np.ndarray:
-        """
-        Encode a normalized, flattened image into state amplitudes.
-
-        The image pixel values become the amplitudes of the quantum state:
-            |ψ⟩ = Σᵢ xᵢ |i⟩ / ||x||
-
-        The state vector is padded to the nearest power of 2.
-
-        Parameters
-        ----------
-        image : np.ndarray
-            Input image (any shape). Will be flattened.
-
-        Returns
-        -------
-        np.ndarray
-            Quantum state vector of length 2^⌈log₂(N)⌉ where
-            N is the number of pixels.
-
-        Notes
-        -----
-        - Requires ⌈log₂(N)⌉ qubits for N pixels.
-        - The actual state preparation circuit is exponentially complex
-          in the worst case, but this function represents the target state.
-        """
         flat = image.flatten().astype(np.float64)
         n_pixels = len(flat)
 
@@ -107,29 +27,6 @@ class QuantumEncoder:
 
     @staticmethod
     def angle_encoding(image: np.ndarray, n_qubits: Optional[int] = None) -> np.ndarray:
-        """
-        Encode pixel values as rotation angles on individual qubits.
-
-        Each qubit i is prepared as:
-            RY(arctan(xᵢ)) |0⟩ = cos(arctan(xᵢ)/2)|0⟩ + sin(arctan(xᵢ)/2)|1⟩
-
-        Parameters
-        ----------
-        image : np.ndarray
-            Input image (any shape). Will be flattened.
-        n_qubits : int, optional
-            Number of qubits. If None, uses min(16, n_pixels).
-
-        Returns
-        -------
-        np.ndarray
-            Quantum state vector of length 2^n_qubits.
-
-        Notes
-        -----
-        Angle encoding uses N qubits for N features, which is less compact
-        than amplitude encoding but results in much simpler circuits.
-        """
         flat = image.flatten().astype(np.float64)
 
         if n_qubits is None:
@@ -157,24 +54,6 @@ class QuantumEncoder:
     def threshold_encoding(
         image: np.ndarray, threshold: float = 0.5
     ) -> np.ndarray:
-        """
-        Binary encoding by thresholding pixel values.
-
-        Pixels above the threshold are encoded as |1⟩, below as |0⟩.
-        The resulting state is a computational basis state |b₁b₂...bₙ⟩.
-
-        Parameters
-        ----------
-        image : np.ndarray
-            Input image (any shape).
-        threshold : float
-            Threshold value (default 0.5).
-
-        Returns
-        -------
-        np.ndarray
-            Quantum state vector (a single basis state).
-        """
         flat = image.flatten().astype(np.float64)
         n_pixels = len(flat)
 
@@ -195,31 +74,6 @@ class QuantumEncoder:
 
     @staticmethod
     def FRQI(image: np.ndarray) -> np.ndarray:
-        """
-        Flexible Representation of Quantum Images (FRQI).
-
-        Encodes an image as:
-            |I⟩ = (1/√N) Σᵢ (cos θᵢ |0⟩ + sin θᵢ |1⟩) ⊗ |i⟩
-
-        where θᵢ = (π/2) · xᵢ maps pixel intensity to angle, and |i⟩
-        is the computational basis state encoding the pixel position.
-
-        Parameters
-        ----------
-        image : np.ndarray
-            Input image with values in [0, 1].
-
-        Returns
-        -------
-        np.ndarray
-            FRQI quantum state vector.
-
-        Notes
-        -----
-        Uses ⌈log₂(N)⌉ + 1 qubits for N pixels.
-        The first qubit encodes the color (intensity), and the remaining
-        qubits encode the pixel position.
-        """
         flat = image.flatten().astype(np.float64)
         if flat.max() > 1.0:
             flat = flat / 255.0
@@ -250,34 +104,6 @@ class QuantumEncoder:
 
     @staticmethod
     def NEQR(image: np.ndarray, n_gray_bits: int = 8) -> np.ndarray:
-        """
-        Novel Enhanced Quantum Representation (NEQR).
-
-        Encodes each pixel's gray level in basis states:
-            |I⟩ = (1/√N) Σᵢ |gᵢ⟩ ⊗ |i⟩
-
-        where |gᵢ⟩ = |c₀c₁...c_{q-1}⟩ is the binary representation
-        of the gray level.
-
-        Parameters
-        ----------
-        image : np.ndarray
-            Input image with values in [0, 1] (will be quantized to
-            2^n_gray_bits levels).
-        n_gray_bits : int
-            Number of bits for gray level representation (default 8).
-
-        Returns
-        -------
-        np.ndarray
-            NEQR quantum state vector.
-
-        Notes
-        -----
-        Uses ⌈log₂(N)⌉ + n_gray_bits qubits for N pixels with
-        2^n_gray_bits gray levels. More qubits than FRQI but provides
-        better information retrieval upon measurement.
-        """
         flat = image.flatten().astype(np.float64)
         if flat.max() > 1.0:
             flat = flat / 255.0
@@ -314,30 +140,6 @@ class QuantumEncoder:
     def decode_amplitude(
         state: np.ndarray, original_shape: Tuple[int, ...]
     ) -> np.ndarray:
-        """
-        Reconstruct an image from an amplitude-encoded quantum state.
-
-        Extracts the real part of the amplitudes and reshapes to the
-        original image dimensions.
-
-        Parameters
-        ----------
-        state : np.ndarray
-            Quantum state vector.
-        original_shape : tuple of int
-            Shape of the original image.
-
-        Returns
-        -------
-        np.ndarray
-            Reconstructed image.
-
-        Notes
-        -----
-        Due to normalization, the reconstructed image is proportional
-        to the original but may differ in scale. The relative pixel
-        intensities are preserved.
-        """
         n_pixels = int(np.prod(original_shape))
         amplitudes = np.real(state[:n_pixels])
 
@@ -350,48 +152,10 @@ class QuantumEncoder:
 
     @staticmethod
     def compression_ratio(original_size: int, n_qubits: int) -> float:
-        """
-        Compute the quantum compression ratio.
-
-        Ratio = original classical bits / quantum bits (qubits).
-
-        Parameters
-        ----------
-        original_size : int
-            Number of classical bits (e.g., 8 * n_pixels for 8-bit image).
-        n_qubits : int
-            Number of qubits used in the encoding.
-
-        Returns
-        -------
-        float
-            Compression ratio. Values > 1 indicate quantum advantage
-            in terms of storage.
-
-        Examples
-        --------
-        >>> # 64-pixel grayscale image (8 bits/pixel = 512 bits)
-        >>> # Amplitude encoding: 6 qubits
-        >>> QuantumEncoder.compression_ratio(512, 6)
-        85.33...
-        """
         return original_size / n_qubits
 
     @staticmethod
     def encoding_info(image: np.ndarray) -> dict:
-        """
-        Compute encoding statistics for a given image.
-
-        Parameters
-        ----------
-        image : np.ndarray
-            Input image.
-
-        Returns
-        -------
-        dict
-            Dictionary with encoding details for each method.
-        """
         flat = image.flatten()
         n_pixels = len(flat)
         classical_bits = 8 * n_pixels

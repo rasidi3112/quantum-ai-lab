@@ -1,27 +1,3 @@
-"""
-Quantum Approximate Optimization Algorithm (QAOA)
-==================================================
-
-Implements QAOA for combinatorial optimisation problems encoded as
-classical Ising Hamiltonians.
-
-The algorithm alternates *p* layers of:
-
-1. **Cost unitary**   :math:`e^{-i\\gamma_l C}`
-2. **Mixer unitary**  :math:`e^{-i\\beta_l B}`
-
-where *C* is the cost Hamiltonian derived from the problem and
-:math:`B = \\sum_i X_i` is the standard transverse-field mixer.
-
-The initial state is the uniform superposition :math:`|+\\rangle^{\\otimes n}`.
-The variational parameters :math:`(\\boldsymbol\\gamma, \\boldsymbol\\beta)`
-are optimised classically to minimise :math:`\\langle\\psi|C|\\psi\\rangle`.
-
-References
-----------
-* Farhi, Goldstone & Gutmann, arXiv:1411.4028 (2014).
-"""
-
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -45,17 +21,6 @@ def _kron_chain(*ops: NDArray[np.complex128]) -> NDArray[np.complex128]:
 
 
 class QAOA:
-    """Quantum Approximate Optimization Algorithm.
-
-    A graph (or arbitrary cost Hamiltonian) is provided, and QAOA
-    constructs and optimises the variational quantum circuit.
-
-    Parameters
-    ----------
-    n_qubits : int
-        Number of qubits (= nodes in a graph problem).
-    """
-
     def __init__(self, n_qubits: int) -> None:
         self.n_qubits = n_qubits
         self.dim = 2 ** n_qubits
@@ -72,27 +37,6 @@ class QAOA:
         n_qubits: int,
         weights: Optional[List[float]] = None,
     ) -> NDArray[np.complex128]:
-        r"""Build cost Hamiltonian from a graph.
-
-        For MaxCut the cost operator is
-
-        .. math::
-
-            C = \sum_{(i,j)\in E} w_{ij}\,\frac{I - Z_i Z_j}{2}
-
-        Parameters
-        ----------
-        graph : list of (int, int)
-            Edge list.
-        n_qubits : int
-            Number of qubits / nodes.
-        weights : list of float, optional
-            Edge weights (default all 1).
-
-        Returns
-        -------
-        ndarray, shape (2^n, 2^n)
-        """
         if weights is None:
             weights = [1.0] * len(graph)
 
@@ -111,16 +55,6 @@ class QAOA:
 
     @staticmethod
     def mixer_hamiltonian(n_qubits: int) -> NDArray[np.complex128]:
-        r"""Standard transverse-field mixer :math:`B = \sum_i X_i`.
-
-        Parameters
-        ----------
-        n_qubits : int
-
-        Returns
-        -------
-        ndarray
-        """
         dim = 2 ** n_qubits
         B = np.zeros((dim, dim), dtype=np.complex128)
         for i in range(n_qubits):
@@ -137,26 +71,6 @@ class QAOA:
         cost_H: NDArray[np.complex128],
         mixer_H: NDArray[np.complex128],
     ) -> NDArray[np.complex128]:
-        r"""Apply *p* QAOA layers to the uniform superposition.
-
-        .. math::
-
-            |\psi(\boldsymbol\gamma, \boldsymbol\beta)\rangle
-            = \prod_{l=1}^{p} e^{-i\beta_l B}\,e^{-i\gamma_l C}
-              \;|+\rangle^{\otimes n}
-
-        Parameters
-        ----------
-        gamma, beta : ndarray, shape (p,)
-            Variational parameters (one per layer).
-        cost_H, mixer_H : ndarray
-            Cost and mixer Hamiltonians.
-
-        Returns
-        -------
-        ndarray
-            Final state vector.
-        """
         n = cost_H.shape[0]
         psi = np.ones(n, dtype=np.complex128) / np.sqrt(n)
 
@@ -175,7 +89,6 @@ class QAOA:
         state: NDArray[np.complex128],
         hamiltonian: NDArray[np.complex128],
     ) -> float:
-        """Compute ⟨ψ|H|ψ⟩."""
         return float(np.real(state.conj() @ hamiltonian @ state))
 
 
@@ -188,28 +101,6 @@ class QAOA:
         maxiter: int = 1000,
         initial_params: Optional[NDArray[np.float64]] = None,
     ) -> Dict[str, Any]:
-        r"""Optimise QAOA parameters for a given graph.
-
-        Parameters
-        ----------
-        graph : list of (int, int)
-            Edge list.
-        p_layers : int
-            Number of QAOA layers.
-        method : str
-            ``scipy.optimize.minimize`` method.
-        weights : list of float, optional
-            Edge weights.
-        maxiter : int
-            Maximum iterations for the classical optimiser.
-        initial_params : ndarray, optional
-            Starting parameters ``[γ_1,…,γ_p, β_1,…,β_p]``.
-
-        Returns
-        -------
-        dict
-            ``{'energy', 'params', 'state', 'result'}``
-        """
         cost_H  = self.cost_hamiltonian(graph, self.n_qubits, weights)
         mixer_H = self.mixer_hamiltonian(self.n_qubits)
         self._cost_H  = cost_H
@@ -249,20 +140,6 @@ class QAOA:
         state: NDArray[np.complex128],
         n_samples: int = 1024,
     ) -> Dict[str, int]:
-        """Sample computational-basis bitstrings from the final state.
-
-        Parameters
-        ----------
-        state : ndarray
-            State vector.
-        n_samples : int
-            Number of samples.
-
-        Returns
-        -------
-        dict
-            ``{bitstring: count}`` sorted by count descending.
-        """
         n_qubits = int(np.log2(len(state)))
         probs = np.abs(state) ** 2
         probs /= probs.sum()
@@ -284,22 +161,6 @@ class QAOA:
         p: int = 1,
         weights: Optional[List[float]] = None,
     ) -> NDArray[np.float64]:
-        r"""Compute 2-D energy landscape for p=1 QAOA.
-
-        Parameters
-        ----------
-        graph : edge list
-        n_qubits : int
-        gamma_range, beta_range : 1-D arrays
-        p : int
-            Number of layers (only first-layer params are scanned).
-        weights : list of float, optional
-
-        Returns
-        -------
-        ndarray, shape (len(gamma_range), len(beta_range))
-            Cost expectation values.
-        """
         cost_H  = QAOA.cost_hamiltonian(graph, n_qubits, weights)
         mixer_H = QAOA.mixer_hamiltonian(n_qubits)
 

@@ -1,26 +1,3 @@
-"""
-MaxCut Solver
-=============
-
-End-to-end pipeline for the **Maximum Cut** problem on unweighted /
-weighted graphs:
-
-1. Generate random graphs.
-2. Map MaxCut → Ising Hamiltonian.
-3. Solve via brute-force enumeration (classical baseline).
-4. Solve via QAOA (quantum approximate).
-5. Evaluate and visualise solutions.
-
-The MaxCut cost function is:
-
-.. math::
-
-    C(z) = \\sum_{(i,j)\\in E} \\frac{1 - z_i z_j}{2}
-         = \\sum_{(i,j)\\in E} \\frac{I - Z_i Z_j}{2}
-
-where :math:`z_i \\in \\{+1,-1\\}` encodes the partition.
-"""
-
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -32,14 +9,6 @@ from quantum_optimization.qaoa import QAOA
 
 
 class MaxCutSolver:
-    """MaxCut problem solver with classical and quantum methods.
-
-    Parameters
-    ----------
-    n_nodes : int
-        Number of graph nodes.
-    """
-
     def __init__(self, n_nodes: int) -> None:
         self.n_nodes = n_nodes
 
@@ -50,22 +19,6 @@ class MaxCutSolver:
         edge_prob: float = 0.5,
         seed: Optional[int] = None,
     ) -> List[Tuple[int, int]]:
-        """Generate a random Erdős-Rényi graph.
-
-        Parameters
-        ----------
-        n_nodes : int
-            Number of vertices.
-        edge_prob : float
-            Probability that any pair of nodes is connected.
-        seed : int, optional
-            Random seed for reproducibility.
-
-        Returns
-        -------
-        list of (int, int)
-            Edge list (undirected, each edge listed once).
-        """
         rng = np.random.default_rng(seed)
         edges: List[Tuple[int, int]] = []
         for i in range(n_nodes):
@@ -81,22 +34,6 @@ class MaxCutSolver:
         n_nodes: int,
         weights: Optional[List[float]] = None,
     ) -> NDArray[np.complex128]:
-        r"""Convert MaxCut instance to Ising Hamiltonian.
-
-        .. math::
-
-            C = \sum_{(i,j)\in E} w_{ij}\,\frac{I - Z_i Z_j}{2}
-
-        Parameters
-        ----------
-        graph : edge list
-        n_nodes : int
-        weights : list of float, optional
-
-        Returns
-        -------
-        ndarray, shape (2^n, 2^n)
-        """
         return QAOA.cost_hamiltonian(graph, n_nodes, weights)
 
 
@@ -106,20 +43,6 @@ class MaxCutSolver:
         graph: List[Tuple[int, int]],
         weights: Optional[List[float]] = None,
     ) -> float:
-        """Evaluate the cut value for a given partition.
-
-        Parameters
-        ----------
-        bitstring : str
-            Binary string of length n_nodes (e.g. ``"0110"``).
-        graph : edge list
-        weights : list of float, optional
-
-        Returns
-        -------
-        float
-            Number (or total weight) of edges crossing the cut.
-        """
         if weights is None:
             weights = [1.0] * len(graph)
         value = 0.0
@@ -134,19 +57,6 @@ class MaxCutSolver:
         n_nodes: int,
         weights: Optional[List[float]] = None,
     ) -> Dict[str, Any]:
-        """Find the maximum cut by exhaustive enumeration.
-
-        Parameters
-        ----------
-        graph : edge list
-        n_nodes : int
-        weights : list of float, optional
-
-        Returns
-        -------
-        dict
-            ``{'max_cut': float, 'bitstring': str, 'all_cuts': dict}``
-        """
         best_cut = -1.0
         best_bs = ""
         all_cuts: Dict[str, float] = {}
@@ -168,21 +78,6 @@ class MaxCutSolver:
         method: str = "COBYLA",
         maxiter: int = 1000,
     ) -> Dict[str, Any]:
-        """Solve MaxCut via QAOA.
-
-        Parameters
-        ----------
-        graph : edge list
-        p_layers : int
-        weights : list of float, optional
-        method : str
-        maxiter : int
-
-        Returns
-        -------
-        dict
-            ``{'energy', 'samples', 'best_bitstring', 'best_cut', 'qaoa_result'}``
-        """
         qaoa = QAOA(self.n_nodes)
         result = qaoa.optimize(graph, p_layers, method, weights, maxiter)
 
@@ -207,21 +102,6 @@ class MaxCutSolver:
         title: str = "Graph",
         ax: Any = None,
     ) -> Any:
-        """Plot the graph using matplotlib (spring layout).
-
-        Parameters
-        ----------
-        graph : edge list
-        n_nodes : int
-        partition : str, optional
-            Bitstring encoding the partition (colours nodes).
-        title : str
-        ax : matplotlib Axes, optional
-
-        Returns
-        -------
-        matplotlib Axes
-        """
         import matplotlib.pyplot as plt
 
         if ax is None:

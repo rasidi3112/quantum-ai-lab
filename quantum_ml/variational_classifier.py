@@ -1,41 +1,9 @@
-"""
-Variational Quantum Classifier (VQC)
-=====================================
-
-A parameterized quantum circuit classifier that learns to map classical
-inputs to class labels through variational optimization.
-
-Architecture:
-    1. Data Encoding: angle-encode classical features as rotation angles
-    2. Variational Layers: trainable RY-RZ rotations + CNOT entanglement
-    3. Measurement: expectation value of Z operator → class prediction
-
-The cost function is minimized using classical optimizers (COBYLA, Nelder-Mead)
-with parameter-shift rule or finite differences for gradient estimation.
-
-References:
-    Schuld, M., et al. (2020). Circuit-centric quantum classifiers.
-    Physical Review A, 101(3), 032308.
-"""
-
 import numpy as np
 from scipy.optimize import minimize
 from typing import Optional, Callable
 
 
 class VariationalClassifier:
-    """Variational Quantum Classifier using parameterized quantum circuits.
-
-    Parameters
-    ----------
-    n_qubits : int
-        Number of qubits in the circuit.
-    n_layers : int
-        Number of variational layers.
-    random_state : int, optional
-        Seed for reproducibility.
-    """
-
     I = np.eye(2, dtype=complex)
     H = np.array([[1, 1], [1, -1]], dtype=complex) / np.sqrt(2)
     X = np.array([[0, 1], [1, 0]], dtype=complex)
@@ -71,12 +39,10 @@ class VariationalClassifier:
         return result
 
     def _ry(self, theta: float) -> np.ndarray:
-        """RY(θ) rotation gate."""
         c, s = np.cos(theta / 2), np.sin(theta / 2)
         return np.array([[c, -s], [s, c]], dtype=complex)
 
     def _rz(self, theta: float) -> np.ndarray:
-        """RZ(θ) rotation gate."""
         return np.array([
             [np.exp(-1j * theta / 2), 0],
             [0, np.exp(1j * theta / 2)]
@@ -88,7 +54,6 @@ class VariationalClassifier:
         return self._kron_list(ops)
 
     def _apply_cnot(self, control: int, target: int, state: np.ndarray) -> np.ndarray:
-        """Apply CNOT between control and target qubits on statevector."""
         n = self.n_qubits
         new_state = np.zeros_like(state)
         for k in range(self.dim):
@@ -102,10 +67,6 @@ class VariationalClassifier:
 
 
     def _encode_data(self, x: np.ndarray) -> np.ndarray:
-        """Angle-encode classical data into quantum state.
-
-        Applies RY(arctan(xᵢ)) · RZ(xᵢ) to qubit i.
-        """
         state = np.zeros(self.dim, dtype=complex)
         state[0] = 1.0
 
@@ -122,15 +83,6 @@ class VariationalClassifier:
         return state
 
     def _variational_layer(self, state: np.ndarray, layer_params: np.ndarray) -> np.ndarray:
-        """Apply one variational layer: RY-RZ rotations + CNOT entanglement.
-
-        Parameters
-        ----------
-        state : np.ndarray
-            Current state vector.
-        layer_params : np.ndarray
-            Parameters of shape (2 * n_qubits,): [ry_0, rz_0, ry_1, rz_1, ...].
-        """
         n = self.n_qubits
 
         for q in range(n):
@@ -147,20 +99,6 @@ class VariationalClassifier:
         return state
 
     def forward(self, x: np.ndarray, params: Optional[np.ndarray] = None) -> float:
-        """Run the full VQC circuit and return expectation value of Z₀.
-
-        Parameters
-        ----------
-        x : np.ndarray
-            Input feature vector.
-        params : np.ndarray, optional
-            Circuit parameters. Uses self.params if None.
-
-        Returns
-        -------
-        float
-            Expectation value ⟨Z₀⟩ in [-1, 1].
-        """
         if params is None:
             params = self.params
 
@@ -180,13 +118,11 @@ class VariationalClassifier:
         return float(expectation + bias)
 
     def predict_proba(self, x: np.ndarray, params: Optional[np.ndarray] = None) -> float:
-        """Return probability of class 1."""
         raw = self.forward(x, params)
         return 1.0 / (1.0 + np.exp(-2 * raw))
 
 
     def _cost_function(self, params: np.ndarray, X: np.ndarray, y: np.ndarray) -> float:
-        """Binary cross-entropy loss over the dataset."""
         total_loss = 0.0
         for xi, yi in zip(X, y):
             p = self.predict_proba(xi, params)
@@ -203,26 +139,6 @@ class VariationalClassifier:
         method: str = "COBYLA",
         verbose: bool = True,
     ) -> dict:
-        """Train the classifier.
-
-        Parameters
-        ----------
-        X : np.ndarray of shape (n_samples, n_features)
-        y : np.ndarray of shape (n_samples,) with values in {0, 1}
-        epochs : int
-            Maximum number of optimizer iterations.
-        lr : float
-            Learning rate (used as step size for COBYLA).
-        method : str
-            Scipy optimization method: 'COBYLA', 'Nelder-Mead', 'Powell'.
-        verbose : bool
-            Print progress.
-
-        Returns
-        -------
-        dict
-            Training results including final loss and parameters.
-        """
         self.training_history = []
 
         def callback(params):
@@ -259,17 +175,6 @@ class VariationalClassifier:
         }
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """Predict class labels for input data.
-
-        Parameters
-        ----------
-        X : np.ndarray of shape (n_samples, n_features)
-
-        Returns
-        -------
-        np.ndarray
-            Predicted labels in {0, 1}.
-        """
         predictions = []
         for x in X:
             p = self.predict_proba(x)
@@ -277,6 +182,5 @@ class VariationalClassifier:
         return np.array(predictions)
 
     def accuracy(self, X: np.ndarray, y: np.ndarray) -> float:
-        """Compute classification accuracy."""
         preds = self.predict(X)
         return float(np.mean(preds == y))

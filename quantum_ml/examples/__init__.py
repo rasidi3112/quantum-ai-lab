@@ -1,14 +1,3 @@
-"""
-Iris Classification with Quantum ML
-====================================
-
-Demonstrates the VariationalClassifier on a subset of the Iris dataset
-(binary classification: setosa vs. versicolor).
-
-No external dataset dependencies — data is hardcoded from the original
-Fisher Iris dataset.
-"""
-
 import numpy as np
 import sys
 import os
@@ -19,11 +8,6 @@ from quantum_ml import VariationalClassifier, QuantumKernel
 
 
 def load_iris_binary():
-    """Load a subset of the Iris dataset for binary classification.
-
-    Returns setosa (class 0) vs. versicolor (class 1) with 2 features
-    (sepal length, sepal width) for efficiency.
-    """
     setosa = np.array([
         [5.1, 3.5], [4.9, 3.0], [4.7, 3.2], [4.6, 3.1], [5.0, 3.6],
         [5.4, 3.9], [4.6, 3.4], [5.0, 3.4], [4.4, 2.9], [4.9, 3.1],

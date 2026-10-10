@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""
-Quantum Chaos Visualization Demo
-=================================
-
-This script runs a complete suite of quantum chaos simulations using:
-1. Level spacing statistics (Poisson vs. Wigner-Dyson distributions).
-2. Quantum kicked top Husimi Q representation on phase space.
-3. Out-of-Time-Order Correlators (OTOC) for Lyapunov exponent estimation.
-
-It saves high-resolution plots illustrating the transition from integrable
-to chaotic behavior.
-"""
-
 import os
 import sys
 import argparse

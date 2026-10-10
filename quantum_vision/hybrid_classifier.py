@@ -1,30 +1,3 @@
-"""
-Hybrid Classical-Quantum Image Classifier
-==========================================
-
-Implements a hybrid image classifier that combines a classical feature
-extractor (two-layer MLP) with a variational quantum circuit for
-classification.
-
-Architecture::
-
-    Image (H×W)                     Classical MLP                  Quantum Circuit
-    ┌──────────┐   flatten   ┌─────────────────────┐   angles   ┌──────────────┐
-    │  Pixels  │ ─────────→ │ Linear → ReLU →      │ ────────→ │ Encode →     │
-    │ H × W    │             │ Linear → features   │           │ Variational →│ → P(class)
-    └──────────┘             └─────────────────────┘           │ Measure      │
-                                                               └──────────────┘
-
-Training uses finite-difference gradients for the quantum parameters
-and numerical backpropagation for the classical MLP weights.
-
-References
-----------
-- Mari et al., "Transfer learning in hybrid classical-quantum neural
-  networks" (2020)
-- Henderson et al., "Quanvolutional Neural Networks" (2020)
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -35,7 +8,6 @@ import numpy as np
 
 @dataclass
 class ClassifierResult:
-    """Diagnostics from training a HybridClassifier."""
     train_losses: List[float] = field(default_factory=list)
     train_accuracies: List[float] = field(default_factory=list)
     final_loss: float = 0.0
@@ -76,7 +48,6 @@ def _kron_chain(*ops: np.ndarray) -> np.ndarray:
 
 def _apply_single_gate(state: np.ndarray, gate: np.ndarray,
                         qubit: int, n_qubits: int) -> np.ndarray:
-    """Apply a single-qubit gate via tensor reshape (efficient)."""
     psi = state.reshape([2] * n_qubits)
     psi = np.tensordot(gate, psi, axes=([1], [qubit]))
     psi = np.moveaxis(psi, 0, qubit)
@@ -85,7 +56,6 @@ def _apply_single_gate(state: np.ndarray, gate: np.ndarray,
 
 def _apply_cnot(state: np.ndarray, control: int, target: int,
                 n_qubits: int) -> np.ndarray:
-    """Apply CNOT gate between control and target qubits."""
     dim = 2 ** n_qubits
     new_state = np.zeros(dim, dtype=np.complex128)
     for k in range(dim):
@@ -100,22 +70,6 @@ def _apply_cnot(state: np.ndarray, control: int, target: int,
 
 def _quantum_forward(x: np.ndarray, q_params: np.ndarray,
                       n_qubits: int, n_layers: int) -> np.ndarray:
-    """Run variational quantum circuit and return measurement probabilities.
-
-    Parameters
-    ----------
-    x : np.ndarray, shape (n_qubits,)
-        Encoded features (rotation angles).
-    q_params : np.ndarray
-        Circuit parameters, shape (n_layers * 2 * n_qubits,).
-    n_qubits : int
-    n_layers : int
-
-    Returns
-    -------
-    np.ndarray
-        Measurement probabilities, shape (2^n_qubits,).
-    """
     dim = 2 ** n_qubits
     state = np.zeros(dim, dtype=np.complex128)
     state[0] = 1.0
@@ -142,30 +96,6 @@ def _quantum_forward(x: np.ndarray, q_params: np.ndarray,
 
 
 class HybridClassifier:
-    """Hybrid classical-quantum image classifier.
-
-    Parameters
-    ----------
-    input_dim : int
-        Flattened input dimensionality (e.g. 64 for 8×8 images).
-    hidden_dim : int
-        Hidden layer size in the classical MLP.
-    n_qubits : int
-        Number of qubits in the quantum circuit.
-    n_layers : int
-        Number of variational circuit layers.
-    n_classes : int
-        Number of output classes (default: 2 for binary classification).
-    seed : int | None
-        Random seed.
-
-    Examples
-    --------
-    >>> clf = HybridClassifier(input_dim=64, hidden_dim=16, n_qubits=4)
-    >>> clf.train(X_train, y_train, epochs=50, lr=0.01)
-    >>> preds = clf.predict(X_test)
-    """
-
     def __init__(
         self,
         input_dim: int = 64,
@@ -200,32 +130,10 @@ class HybridClassifier:
 
 
     def _classical_forward(self, x: np.ndarray) -> np.ndarray:
-        """Two-layer MLP: x → hidden → encoded angles.
-
-        Parameters
-        ----------
-        x : np.ndarray, shape ``(input_dim,)``
-
-        Returns
-        -------
-        np.ndarray, shape ``(n_qubits,)``
-        """
         h = _relu(self.W1 @ x + self.b1)
         return np.tanh(self.W2 @ h + self.b2)
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        """Full forward pass: classical MLP → quantum circuit → class probs.
-
-        Parameters
-        ----------
-        x : np.ndarray, shape ``(input_dim,)``
-            Flattened input image.
-
-        Returns
-        -------
-        np.ndarray, shape ``(n_classes,)``
-            Class probability distribution.
-        """
         encoded = self._classical_forward(x)
         q_probs = _quantum_forward(
             encoded, self.q_params, self.n_qubits, self.n_layers
@@ -244,28 +152,6 @@ class HybridClassifier:
         epsilon: float = 1e-3,
         verbose: bool = True,
     ) -> ClassifierResult:
-        """Train the hybrid classifier.
-
-        Uses finite-difference gradients for all parameters.
-
-        Parameters
-        ----------
-        X_train : np.ndarray, shape ``(n_samples, input_dim)``
-        y_train : np.ndarray, shape ``(n_samples,)`` with int class labels
-        epochs : int
-        lr : float
-            Learning rate.
-        batch_size : int
-            Mini-batch size.
-        epsilon : float
-            Finite-difference step size.
-        verbose : bool
-            Print training progress.
-
-        Returns
-        -------
-        ClassifierResult
-        """
         result = ClassifierResult()
         n_samples = len(X_train)
 
@@ -317,10 +203,6 @@ class HybridClassifier:
         lr: float,
         epsilon: float,
     ) -> Tuple[float, int]:
-        """Single gradient update step on a mini-batch.
-
-        Returns (batch_loss, n_correct).
-        """
         batch_loss = 0.0
         correct = 0
 
@@ -376,43 +258,12 @@ class HybridClassifier:
 
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """Predict class labels.
-
-        Parameters
-        ----------
-        X : np.ndarray, shape ``(n_samples, input_dim)``
-
-        Returns
-        -------
-        np.ndarray, shape ``(n_samples,)``
-        """
         return np.array([np.argmax(self.forward(x)) for x in X])
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        """Predict class probabilities.
-
-        Parameters
-        ----------
-        X : np.ndarray, shape ``(n_samples, input_dim)``
-
-        Returns
-        -------
-        np.ndarray, shape ``(n_samples, n_classes)``
-        """
         return np.array([self.forward(x) for x in X])
 
     def accuracy(self, X: np.ndarray, y: np.ndarray) -> float:
-        """Compute classification accuracy.
-
-        Parameters
-        ----------
-        X : np.ndarray
-        y : np.ndarray
-
-        Returns
-        -------
-        float
-        """
         preds = self.predict(X)
         return float(np.mean(preds == y))
 

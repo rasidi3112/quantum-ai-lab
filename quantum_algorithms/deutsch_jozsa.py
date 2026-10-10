@@ -1,42 +1,3 @@
-"""
-Deutsch–Jozsa Algorithm
-========================
-
-The Deutsch–Jozsa algorithm (1992) is one of the first examples of a
-provable quantum speed-up.  Given a Boolean function
-``f : {0,1}^n → {0,1}`` promised to be either:
-
-* **constant** – f(x) is the same for all x, or
-* **balanced** – f(x) = 0 for exactly half the inputs and 1 for the rest,
-
-the algorithm determines which case holds with **a single query** to the
-quantum oracle, whereas any classical deterministic algorithm needs up to
-``2^{n-1} + 1`` queries in the worst case.
-
-Circuit
--------
-::
-
-    |0⟩^⊗n ─── H^⊗n ─── U_f ─── H^⊗n ─── Measure
-    |1⟩    ─── H     ───     ───         ─── (discard)
-
-If the measurement yields |0⟩^⊗n, f is constant; otherwise f is balanced.
-
-Oracle encoding
----------------
-The oracle acts on (n+1) qubits as:
-
-.. math::
-
-    U_f |x\\rangle|y\\rangle = |x\\rangle|y \\oplus f(x)\\rangle
-
-When the ancilla is prepared in ``|−⟩``, this reduces to a phase kickback:
-
-.. math::
-
-    U_f |x\\rangle|{-}\\rangle = (-1)^{f(x)} |x\\rangle|{-}\\rangle
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -47,7 +8,6 @@ import numpy as np
 
 @dataclass
 class DeutschJozsaResult:
-    """Result of the Deutsch–Jozsa algorithm."""
     oracle_type: str = ""
     measurement_result: np.ndarray = field(default_factory=lambda: np.array([]))
     probabilities: np.ndarray = field(default_factory=lambda: np.array([]))
@@ -56,38 +16,12 @@ class DeutschJozsaResult:
 
 
 class DeutschJozsa:
-    """Statevector simulation of the Deutsch–Jozsa algorithm.
-
-    Examples
-    --------
-    >>> dj = DeutschJozsa()
-    >>> oracle = dj.balanced_oracle(3, pattern=5)
-    >>> result = dj.run(oracle, 3)
-    >>> print(result.oracle_type)
-    balanced
-    """
-
     def __init__(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(seed)
 
 
     @staticmethod
     def constant_oracle(n_qubits: int, value: int = 0) -> np.ndarray:
-        """Create a constant oracle (f(x) = value for all x).
-
-        Parameters
-        ----------
-        n_qubits : int
-            Number of input qubits (excluding the ancilla).
-        value : int
-            0 or 1.
-
-        Returns
-        -------
-        np.ndarray
-            Unitary matrix of shape ``(2N, 2N)`` with ``N = 2^n``,
-            acting on (n + 1) qubits.
-        """
         N = 2 ** n_qubits
         dim = 2 * N
         oracle = np.eye(dim, dtype=complex)
@@ -100,22 +34,6 @@ class DeutschJozsa:
 
     @staticmethod
     def balanced_oracle(n_qubits: int, pattern: int) -> np.ndarray:
-        """Create a balanced oracle defined by a bit pattern.
-
-        ``f(x) = (x · pattern) mod 2`` (inner product mod 2) is balanced
-        for any non-zero ``pattern``.
-
-        Parameters
-        ----------
-        n_qubits : int
-        pattern : int
-            A non-zero integer in ``[1, 2^n - 1]`` defining the oracle.
-
-        Returns
-        -------
-        np.ndarray
-            Unitary ``(2N, 2N)`` matrix.
-        """
         N = 2 ** n_qubits
         dim = 2 * N
         oracle = np.eye(dim, dtype=complex)
@@ -135,18 +53,6 @@ class DeutschJozsa:
     def random_oracle(self, n_qubits: int,
                       oracle_type: Optional[str] = None
                       ) -> Tuple[np.ndarray, str]:
-        """Generate a random constant or balanced oracle.
-
-        Parameters
-        ----------
-        n_qubits : int
-        oracle_type : str | None
-            ``'constant'``, ``'balanced'``, or None (random choice).
-
-        Returns
-        -------
-        (oracle, type_str) : tuple
-        """
         if oracle_type is None:
             oracle_type = self.rng.choice(["constant", "balanced"])
 
@@ -159,19 +65,6 @@ class DeutschJozsa:
 
 
     def run(self, oracle: np.ndarray, n_qubits: int) -> DeutschJozsaResult:
-        """Run the Deutsch–Jozsa algorithm.
-
-        Parameters
-        ----------
-        oracle : np.ndarray
-            The ``(2N, 2N)`` oracle unitary (N = 2^n_qubits).
-        n_qubits : int
-            Number of input qubits.
-
-        Returns
-        -------
-        DeutschJozsaResult
-        """
         N = 2 ** n_qubits
         dim = 2 * N
 
@@ -214,21 +107,6 @@ class DeutschJozsa:
 
     @staticmethod
     def verify(oracle: np.ndarray, n_qubits: int) -> str:
-        """Classically verify whether the oracle is constant or balanced.
-
-        Queries the oracle on all ``2^n`` inputs by examining the diagonal
-        action on computational-basis states.
-
-        Parameters
-        ----------
-        oracle : np.ndarray
-        n_qubits : int
-
-        Returns
-        -------
-        str
-            ``'constant'`` or ``'balanced'``.
-        """
         N = 2 ** n_qubits
 
         f_values = []

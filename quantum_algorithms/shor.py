@@ -1,37 +1,3 @@
-"""
-Shor's Factoring Algorithm
-===========================
-
-Shor's algorithm (1994) factors an integer *N* in polynomial time on a
-quantum computer, breaking RSA and similar cryptosystems.
-
-The core quantum subroutine is **quantum period finding** (order finding):
-given random *a < N* with ``gcd(a, N) = 1``, find the smallest positive
-integer *r* such that ``a^r ≡ 1  (mod N)``.
-
-Once *r* is known (and even), the factors emerge from:
-
-.. math::
-
-    \\gcd(a^{r/2} \\pm 1,\\; N)
-
-Algorithm steps
----------------
-1. Pick random ``a`` with ``1 < a < N``.
-2. Compute ``gcd(a, N)``; if non-trivial, we're done.
-3. Use the quantum period-finding circuit (QPE + modular exponentiation)
-   to find the order ``r`` of ``a`` modulo ``N``.
-4. If ``r`` is odd or ``a^{r/2} ≡ −1 (mod N)``, go to step 1.
-5. Return ``gcd(a^{r/2} − 1, N)`` and ``gcd(a^{r/2} + 1, N)``.
-
-Implementation notes
---------------------
-This module provides a *classical simulation* of the quantum algorithm:
-statevectors are manipulated via NumPy matrix operations.  For practical
-reasons the qubit counts are kept small (N ≤ ~100), but the code faithfully
-reproduces the QPE-based period-finding structure.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -44,7 +10,6 @@ import numpy as np
 
 @dataclass
 class ShorResult:
-    """Container for Shor's factoring results."""
     N: int = 0
     factors: Tuple[int, int] = (0, 0)
     a_used: int = 0
@@ -55,40 +20,12 @@ class ShorResult:
 
 
 class ShorFactoring:
-    """Classical simulation of Shor's quantum factoring algorithm.
-
-    Parameters
-    ----------
-    seed : int | None
-        Random seed for reproducibility.
-
-    Examples
-    --------
-    >>> shor = ShorFactoring(seed=42)
-    >>> result = shor.factor(15)
-    >>> print(f"{result.N} = {result.factors[0]} × {result.factors[1]}")
-    """
-
     def __init__(self, seed: Optional[int] = None) -> None:
         self.rng = np.random.default_rng(seed)
 
 
     @staticmethod
     def classical_order_check(a: int, N: int) -> int:
-        """Brute-force period finding: find smallest r with a^r ≡ 1 (mod N).
-
-        Used to verify quantum results.
-
-        Parameters
-        ----------
-        a : int
-        N : int
-
-        Returns
-        -------
-        int
-            The order *r*, or -1 if not found within N steps.
-        """
         if gcd(a, N) != 1:
             return -1
         r = 1
@@ -101,22 +38,6 @@ class ShorFactoring:
 
     @staticmethod
     def qft_matrix(n: int) -> np.ndarray:
-        """Construct the n-qubit QFT unitary matrix.
-
-        .. math::
-
-            (\\text{QFT})_{jk} = \\frac{1}{\\sqrt{N}} \\omega^{jk},
-            \\quad \\omega = e^{2\\pi i / N}
-
-        Parameters
-        ----------
-        n : int
-            Number of qubits.
-
-        Returns
-        -------
-        np.ndarray, shape ``(N, N)`` with ``N = 2**n``
-        """
         N = 2 ** n
         omega = np.exp(2j * np.pi / N)
         indices = np.arange(N)
@@ -126,26 +47,6 @@ class ShorFactoring:
     @staticmethod
     def controlled_modular_exp(a: int, power: int, N: int,
                                n_qubits: int) -> np.ndarray:
-        """Construct the unitary for ``|x⟩ → |a^power · x  mod N⟩``.
-
-        Acts on the computational-basis states in the range [0, N-1]
-        and maps states ≥ N to themselves (identity padding).
-
-        Parameters
-        ----------
-        a : int
-            Base for modular exponentiation.
-        power : int
-            Exponent (typically ``2**k`` in QPE).
-        N : int
-            Modulus.
-        n_qubits : int
-            Number of qubits in the target register.
-
-        Returns
-        -------
-        np.ndarray, shape ``(dim, dim)`` with ``dim = 2**n_qubits``
-        """
         dim = 2 ** n_qubits
         U = np.zeros((dim, dim), dtype=complex)
         a_pow = pow(a, power, N)
@@ -159,26 +60,6 @@ class ShorFactoring:
 
 
     def quantum_period_finding(self, a: int, N: int) -> int:
-        """Simulate QPE-based period finding for ``a mod N``.
-
-        The simulation works as follows:
-
-        1. Prepare the *counting register* (``n_count`` qubits) in uniform
-           superposition and the *work register* in ``|1⟩``.
-        2. Apply controlled-``U^{2^k}`` gates (modular exponentiation).
-        3. Apply inverse QFT to the counting register.
-        4. Measure and extract the period via continued fractions.
-
-        Parameters
-        ----------
-        a : int
-        N : int
-
-        Returns
-        -------
-        int
-            Estimated period *r*, or -1 on failure.
-        """
         n_count = max(4, 2 * ceil(log2(N + 1)))
         n_work  = max(2, ceil(log2(N + 1)))
         Q = 2 ** n_count
@@ -231,44 +112,12 @@ class ShorFactoring:
 
     @staticmethod
     def continued_fractions(measured: int, Q: int, N: int) -> int:
-        """Extract the period from a QPE measurement using continued fractions.
-
-        We approximate ``measured / Q`` as a fraction ``s / r`` where
-        ``r < N``, then return ``r``.
-
-        Parameters
-        ----------
-        measured : int
-            Measured value from counting register.
-        Q : int
-            Size of counting register ``2**n_count``.
-        N : int
-            The number being factored.
-
-        Returns
-        -------
-        int
-            Candidate period, or -1 if extraction fails.
-        """
         frac = Fraction(measured, Q).limit_denominator(N)
         r = frac.denominator
         return r if r > 0 else -1
 
 
     def factor(self, N: int, max_attempts: int = 20) -> ShorResult:
-        """Factor *N* using Shor's algorithm.
-
-        Parameters
-        ----------
-        N : int
-            The composite number to factor (must be > 1 and not prime).
-        max_attempts : int
-            Maximum number of random *a* values to try.
-
-        Returns
-        -------
-        ShorResult
-        """
         result = ShorResult(N=N)
 
         if N <= 1:

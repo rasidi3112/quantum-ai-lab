@@ -127,53 +127,10 @@ print(f"Avg magnetization:   {mag_profile.mean():.4f}")
 
 ## Architecture
 
-```mermaid
-graph TB
-    subgraph "Quantum AI Laboratory"
-        direction TB
 
-        subgraph "Core Layer"
-            ML["Quantum ML"]
-            ALG["Algorithms"]
-            SIM["Simulation"]
-        end
-
-        subgraph "Application Layer"
-            CRYPTO["Cryptography"]
-            OPT["Optimization"]
-            RL["Reinforcement Learning"]
-            VISION["Vision"]
-        end
-
-        subgraph "Theory Layer"
-            CHAOS["Chaos"]
-        end
-
-        ALG --> ML
-        ALG --> CRYPTO
-        ALG --> OPT
-        SIM --> CHAOS
-        SIM --> OPT
-        ML --> RL
-        ML --> VISION
-    end
-
-    subgraph "Foundation"
-        NP["NumPy"]
-        SP["SciPy"]
-        MPL["Matplotlib"]
-    end
-
-    ML --> NP
-    ALG --> NP
-    SIM --> SP
-    CRYPTO --> NP
-    OPT --> SP
-    RL --> NP
-    VISION --> NP
-    CHAOS --> SP
-    SIM --> MPL
-```
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="Architecture" width="100%" />
+</p>
 
 ##  Repository Structure
 
