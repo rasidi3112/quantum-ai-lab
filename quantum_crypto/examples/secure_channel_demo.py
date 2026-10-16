@@ -35,7 +35,7 @@ def run_otp() -> None:
     print("\n" + "-" * 60)
     print("  3. Quantum one-time pad — encrypt a message with a QKD key")
     print("-" * 60)
-    message = "Quantum keys can't be copied 🔐 — no-cloning theorem!"
+    message = "Quantum keys can't be copied — no-cloning theorem! (ünïcödé ok)"
     for protocol in ("bb84", "e91"):
         result = QuantumOTP(seed=11).secure_communicate(message, protocol=protocol)
         cipher = "".join(map(str, result.ciphertext_bits[:48]))

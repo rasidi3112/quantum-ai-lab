@@ -65,6 +65,7 @@ dmypy.json
 *.svg
 !docs/**/*.png
 !docs/**/*.svg
+!docs/**/*.gif
 
 # OS
 .DS_Store

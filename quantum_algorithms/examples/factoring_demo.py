@@ -39,7 +39,7 @@ def run_deutsch_jozsa() -> None:
         oracle, truth = dj.random_oracle(4, kind)
         verdict = dj.run(oracle, 4).oracle_type
         print(f"  hidden oracle: {truth:9s} → measured: {verdict:9s} "
-              f"{'✓' if verdict == truth else '✗'}")
+              f"{'correct' if verdict == truth else 'WRONG'}")
 
 
 def run_phase_estimation() -> None:

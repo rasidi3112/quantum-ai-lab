@@ -13,11 +13,11 @@ and every headline number below is checked by the test suite.
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 
-[Quick start](#-quick-start) · [Gallery](#-gallery) · [Modules](#-modules) · [Verified results](#-verified-results) · [Python API](#-python-api) · [Contributing](#-contributing)
+[Quick start](#quick-start) · [Gallery](#gallery) · [Modules](#modules) · [Verified results](#verified-results) · [Python API](#python-api) · [Contributing](#contributing)
 
 </div>
 
-## ✨ Why this repo
+## Why this repo
 
 - **No black boxes.** No Qiskit, no PennyLane, no hidden simulator: gates are NumPy arrays, circuits are loops you can read and step through.
 - **Breadth.** Algorithms, cryptography, ML, many-body physics, optimization, reinforcement learning, computer vision and quantum chaos, all behind one consistent API.
@@ -25,7 +25,7 @@ and every headline number below is checked by the test suite.
 - **Documented and typed.** Every public module, class and function has a NumPy-style docstring with references to the original papers, and the code is fully type-annotated. Ruff and mypy enforce both in CI.
 - **Fast enough to play with.** The whole tour runs in about 3 seconds on a laptop CPU.
 
-## 🚀 Quick start
+## Quick start
 
 ```bash
 pip install git+https://github.com/rasidi3112/quantum-ai-lab.git
@@ -60,7 +60,7 @@ python scripts/make_banner.py    # regenerate the animated banner
 
 </details>
 
-## 🖼 Gallery
+## Gallery
 
 Every image and animation is produced from the library itself by [`scripts/make_figures.py`](scripts/make_figures.py), [`make_banner.py`](scripts/make_banner.py) and [`make_terminal_gif.py`](scripts/make_terminal_gif.py).
 
@@ -79,7 +79,7 @@ Every image and animation is produced from the library itself by [`scripts/make_
 </tr>
 </table>
 
-## 🧩 Modules
+## Modules
 
 | Module | What's inside | Demo |
 |---|---|---|
@@ -92,7 +92,7 @@ Every image and animation is produced from the library itself by [`scripts/make_
 | [`quantum_rl`](quantum_rl/) | Data-re-uploading quantum policy, hybrid classical–quantum REINFORCE agent, CartPole and FrozenLake | `qailab demo rl` |
 | [`quantum_vision`](quantum_vision/) | Amplitude, angle, FRQI and NEQR image encodings, quanvolution, hybrid MLP→VQC classifier trained end-to-end with parameter shift | `qailab demo vision` |
 
-## ✅ Verified results
+## Verified results
 
 Each row is asserted in [`tests/`](tests/), so CI fails if it ever stops being true.
 
@@ -121,7 +121,7 @@ From `qailab demo optimization`: choosing 3 of 6 assets (20 valid portfolios out
 | QAOA, X mixer + penalty term | 43.3% | 2.9% |
 | **QAOA, XY mixer from a Dicke state** | **100.0%** | **44.1%** |
 
-## 🐍 Python API
+## Python API
 
 ```python
 from quantum_algorithms import ShorFactoring, GroverSearch
@@ -135,8 +135,8 @@ print(result.factors, result.period_found, result.method)    # (7, 3) 6 quantum 
 key, stats = BB84Protocol(seed=0).run_protocol(n_qubits=2000, eve_present=True)
 print(f"QBER={stats.qber:.1%} secure={stats.protocol_secure}")  # QBER≈25% secure=False
 
-msg = QuantumOTP(seed=0).secure_communicate("Halo dunia 🚀", protocol="e91")
-print(msg.decrypted_text, msg.success)                        # Halo dunia 🚀 True
+msg = QuantumOTP(seed=0).secure_communicate("Halo dunia, ünïcödé ok", protocol="e91")
+print(msg.decrypted_text, msg.success)                        # Halo dunia, ünïcödé ok True
 
 graph = MaxCutSolver.random_graph(8, edge_prob=0.5, seed=1)
 print(MaxCutSolver(8).qaoa_solve(graph, p_layers=2, seed=0)["best_cut"])  # 12.0
@@ -158,7 +158,7 @@ result = QAOA(6, seed=0).optimize_hamiltonian(
 samples = QAOA.sample_solution(result["state"], n_samples=1000, seed=0)
 ```
 
-## 🏗 Architecture
+## Architecture
 
 ```mermaid
 flowchart TB
@@ -179,7 +179,7 @@ flowchart TB
 
 Each package is self-contained, so you can read one module without the others. More detail in [docs/architecture.md](docs/architecture.md).
 
-## 📐 Under the hood
+## Under the hood
 
 | Concept | Formula | Where |
 |---|---|---|
@@ -194,7 +194,7 @@ Each package is self-contained, so you can read one module without the others. M
 
 Statevector simulation scales as 2ⁿ, so the demos stay at 4–12 qubits. That is the point: small enough to inspect every amplitude.
 
-## 🗺 Roadmap
+## Roadmap
 
 - [ ] Noise models (depolarizing, amplitude damping) and error-mitigation demos
 - [ ] Optional Qiskit / PennyLane backends to run the same circuits on real hardware
@@ -203,17 +203,17 @@ Statevector simulation scales as 2ⁿ, so the demos stay at 4–12 qubits. That 
 
 Ideas and pull requests are welcome: see the [good first issues](CONTRIBUTING.md#good-first-issues).
 
-## 🤝 Contributing
+## Contributing
 
 Contributions of new algorithms, demos, tests and docs are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), then run `ruff check . && pytest` before opening a pull request.
 
-If this project helped you learn or teach quantum computing, consider giving it a ⭐. It helps others find it.
+If this project helped you learn or teach quantum computing, consider giving it a star. It helps others find it.
 
-## 📚 Citation
+## Citation
 
 If you use Quantum AI Lab in research or teaching, please cite it via the [CITATION.cff](CITATION.cff) file (GitHub's "Cite this repository" button).
 
-## 📖 References
+## References
 
 1. Nielsen & Chuang, *Quantum Computation and Quantum Information* (2010).
 2. Shor, Polynomial-time algorithms for prime factorization and discrete logarithms, *SIAM J. Comput.* 26 (1997).
@@ -227,6 +227,6 @@ If you use Quantum AI Lab in research or teaching, please cite it via the [CITAT
 10. Henderson et al., Quanvolutional neural networks, *Quantum Mach. Intell.* 2, 2 (2020).
 11. Haake, *Quantum Signatures of Chaos* (2010); Atas et al., *PRL* 110, 084101 (2013).
 
-## 📄 License
+## License
 
 [MIT](LICENSE)

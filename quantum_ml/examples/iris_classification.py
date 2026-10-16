@@ -85,7 +85,7 @@ def main():
     print("\n  Test Predictions:")
     preds = clf.predict(X_test)
     for i, (pred, true) in enumerate(zip(preds, y_test)):
-        status = "✓" if pred == true else "✗"
+        status = "correct" if pred == true else "WRONG"
         label_pred = "setosa" if pred == 0 else "versicolor"
         label_true = "setosa" if true == 0 else "versicolor"
         print(f"    Sample {i+1}: predicted={label_pred:12s} true={label_true:12s} {status}")

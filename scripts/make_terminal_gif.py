@@ -39,7 +39,7 @@ def styled(line: str) -> list[tuple[str, str, bool]]:
     stripped = line.strip()
     if stripped.startswith("$"):
         return [("$ ", "prompt", True), (stripped[2:], "text", False)]
-    if stripped.startswith("⚛"):
+    if stripped.startswith("Quantum AI Lab"):
         head, _, version = line.partition("  v")
         return [(head, "magenta", True), (f"  v{version}", "dim", False)]
     if stripped.startswith("─") or stripped.startswith("8 quantum"):
@@ -48,7 +48,7 @@ def styled(line: str) -> list[tuple[str, str, bool]]:
         tag_end = line.index("]") + 1
         title, _, meta = line[tag_end:].partition(" · ")
         return [(line[:tag_end], "cyan", True), (title, "text", True), (f" · {meta}", "dim", False)]
-    if stripped.startswith("✓"):
+    if stripped.startswith("Tour finished"):
         head, _, tail = line.partition("  Try")
         return [(head, "green", True), (f"  Try{tail}" if tail else "", "dim", False)]
     return [(line, "text", False)]

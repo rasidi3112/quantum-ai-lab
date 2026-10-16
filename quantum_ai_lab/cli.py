@@ -77,7 +77,7 @@ def _use_color() -> bool:
 
 def _banner(style: Style) -> str:
     return "\n".join([
-        "  " + style.bold(style.magenta("⚛  Quantum AI Lab")) + style.dim(f"  v{__version__}"),
+        "  " + style.bold(style.magenta("Quantum AI Lab")) + style.dim(f"  v{__version__}"),
         "  " + style.dim("8 quantum computing modules · pure NumPy/SciPy · no quantum hardware needed"),
         "  " + style.magenta("─" * 76),
     ])
@@ -214,7 +214,7 @@ def run_tour(style: Style) -> int:
             print(f"        {line}")
         print()
     total = time.perf_counter() - start
-    print(style.green(f"  ✓ Tour finished in {total:.1f}s on a classical CPU.") +
+    print(style.green(f"  Tour finished in {total:.1f}s on a classical CPU.") +
           style.dim("  Try `qailab demo <module>` for the full demos."))
     return 0
 
