@@ -1,7 +1,20 @@
+"""E91 entanglement-based quantum key distribution.
+
+Alice and Bob share singlet pairs ``|psi-> = (|01> - |10>) / sqrt(2)`` and
+measure along randomly chosen analyzer angles. Rounds with equal angles give
+perfectly anti-correlated (hence shareable) key bits; the other rounds feed a
+CHSH test whose value ``|S| > 2`` certifies entanglement, ideally reaching
+Tsirelson's bound ``2 sqrt(2)``.
+
+References
+----------
+Ekert, A. K. "Quantum cryptography based on Bell's theorem."
+Phys. Rev. Lett. 67, 661 (1991).
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -11,7 +24,7 @@ KET_1 = np.array([0.0, 1.0], dtype=complex)
 BELL_PSI_MINUS = (np.kron(KET_0, KET_1) - np.kron(KET_1, KET_0)) / np.sqrt(2)
 
 
-def _rotation_basis_vectors(theta: float) -> Tuple[np.ndarray, np.ndarray]:
+def _rotation_basis_vectors(theta: float) -> tuple[np.ndarray, np.ndarray]:
     cos = np.cos(theta / 2)
     sin = np.sin(theta / 2)
     plus_theta  = np.array([ cos, sin], dtype=complex)
@@ -21,37 +34,97 @@ def _rotation_basis_vectors(theta: float) -> Tuple[np.ndarray, np.ndarray]:
 
 @dataclass
 class E91Statistics:
+    """Bookkeeping for one E91 run.
+
+    Attributes
+    ----------
+    n_pairs : int
+        Entangled pairs distributed.
+    n_key_bits : int
+        Raw key length (rounds with matching analyzers).
+    chsh_value : float
+        Measured CHSH combination ``S``.
+    bell_violated : bool
+        Whether ``|S| > 2``.
+    correlations : dict
+        Measured correlator ``E(a, b)`` for each angle pair.
+    alice_key, bob_key : list of int
+        Raw keys of each party (Bob's bits already flipped).
+    """
+
     n_pairs: int = 0
     n_key_bits: int = 0
     chsh_value: float = 0.0
     bell_violated: bool = False
-    correlations: Dict[str, float] = field(default_factory=dict)
-    alice_key: List[int] = field(default_factory=list)
-    bob_key: List[int] = field(default_factory=list)
+    correlations: dict[str, float] = field(default_factory=dict)
+    alice_key: list[int] = field(default_factory=list)
+    bob_key: list[int] = field(default_factory=list)
 
 
 class E91Protocol:
+    """Simulation of the E91 protocol on singlet pairs.
+
+    Parameters
+    ----------
+    seed : int, optional
+        Seed for analyzer choices and measurement outcomes.
+    """
+
     ALICE_ANGLES = (np.pi / 2, 0.0,           3 * np.pi / 8)
     BOB_ANGLES   = (np.pi / 4, -np.pi / 4,    3 * np.pi / 8)
 
-    def __init__(self, seed: Optional[int] = None) -> None:
+    def __init__(self, seed: int | None = None) -> None:
         self.rng = np.random.default_rng(seed)
 
 
     @staticmethod
-    def generate_entangled_pairs(n: int) -> List[np.ndarray]:
+    def generate_entangled_pairs(n: int) -> list[np.ndarray]:
+        """Create ``n`` copies of the singlet state.
+
+        Parameters
+        ----------
+        n : int
+            Number of pairs.
+
+        Returns
+        -------
+        list of numpy.ndarray
+            Two-qubit states of length 4.
+        """
         return [BELL_PSI_MINUS.copy() for _ in range(n)]
 
 
     @classmethod
-    def choose_measurement_angles(cls) -> Tuple[Tuple[float, ...],
-                                                  Tuple[float, ...]]:
+    def choose_measurement_angles(cls) -> tuple[tuple[float, ...],
+                                                  tuple[float, ...]]:
+        """Return the analyzer angles of Alice and Bob.
+
+        Returns
+        -------
+        alice_angles, bob_angles : tuple of float
+            Three angles each; the first two are used for CHSH and the third is
+            shared and used for the key.
+        """
         return cls.ALICE_ANGLES, cls.BOB_ANGLES
 
 
     def measure_entangled(self, pair: np.ndarray,
                           angle_a: float,
-                          angle_b: float) -> Tuple[int, int]:
+                          angle_b: float) -> tuple[int, int]:
+        """Measure a pair along the two analyzer angles.
+
+        Parameters
+        ----------
+        pair : numpy.ndarray
+            Two-qubit state.
+        angle_a, angle_b : float
+            Bloch-sphere angles (in the x–z plane) of Alice's and Bob's analyzers.
+
+        Returns
+        -------
+        tuple of int
+            Outcomes ``(a, b)`` with ``0`` for "+" and ``1`` for "-".
+        """
         a_plus, a_minus = _rotation_basis_vectors(angle_a)
         b_plus, b_minus = _rotation_basis_vectors(angle_b)
 
@@ -65,13 +138,24 @@ class E91Protocol:
         probs = np.array([np.abs(np.vdot(p, pair)) ** 2 for p in projectors])
         probs /= probs.sum()
 
-        outcome_idx = self.rng.choice(4, p=probs)
-        outcomes = [(0, 0), (0, 1), (1, 0), (1, 1)]
-        return outcomes[outcome_idx]
+        outcome_idx = int(self.rng.choice(4, p=probs))
+        return outcome_idx >> 1, outcome_idx & 1
 
 
     @staticmethod
-    def compute_chsh(correlations: Dict[Tuple[float, float], float]) -> float:
+    def compute_chsh(correlations: dict[tuple[float, float], float]) -> float:
+        """Combine correlators into the CHSH value ``S``.
+
+        Parameters
+        ----------
+        correlations : dict
+            ``E(a, b)`` keyed by rounded ``(angle_a, angle_b)`` tuples.
+
+        Returns
+        -------
+        float
+            ``S = E(a1, b1) - E(a1, b2) + E(a2, b1) + E(a2, b2)``.
+        """
         a1, a2 = np.pi / 2, 0.0
         b1, b2 = np.pi / 4, -np.pi / 4
 
@@ -84,19 +168,45 @@ class E91Protocol:
 
     @staticmethod
     def check_bell_violation(S: float) -> bool:
+        """Return whether ``|S|`` exceeds the classical bound of 2."""
         return abs(S) > 2.0
 
 
     @staticmethod
-    def extract_key(results: List[Tuple[int, int]]) -> Tuple[List[int],
-                                                               List[int]]:
+    def extract_key(results: list[tuple[int, int]]) -> tuple[list[int],
+                                                               list[int]]:
+        """Split outcome pairs into Alice's and Bob's raw keys.
+
+        Parameters
+        ----------
+        results : list of tuple of int
+            Outcomes of the key-generating rounds.
+
+        Returns
+        -------
+        alice_key, bob_key : list of int
+        """
         alice_key = [a for a, _ in results]
         bob_key   = [b for _, b in results]
         return alice_key, bob_key
 
 
     def run_protocol(self, n_pairs: int = 1000
-                     ) -> Tuple[np.ndarray, E91Statistics]:
+                     ) -> tuple[np.ndarray, E91Statistics]:
+        """Run E91 end to end.
+
+        Parameters
+        ----------
+        n_pairs : int, default 1000
+            Number of entangled pairs; about one in nine becomes a key bit.
+
+        Returns
+        -------
+        key : numpy.ndarray
+            Alice's raw key.
+        stats : E91Statistics
+            Diagnostics including the CHSH value.
+        """
         stats = E91Statistics(n_pairs=n_pairs)
         pairs = self.generate_entangled_pairs(n_pairs)
         alice_angles, bob_angles = self.choose_measurement_angles()
@@ -104,8 +214,8 @@ class E91Protocol:
         a_choices = self.rng.integers(0, 3, size=n_pairs)
         b_choices = self.rng.integers(0, 3, size=n_pairs)
 
-        key_results: List[Tuple[int, int]] = []
-        corr_counts: Dict[Tuple[float, float], List[int]] = {}
+        key_results: list[tuple[int, int]] = []
+        corr_counts: dict[tuple[float, float], list[int]] = {}
 
         for i in range(n_pairs):
             aa = alice_angles[a_choices[i]]
@@ -121,7 +231,7 @@ class E91Protocol:
                     corr_counts[k] = []
                 corr_counts[k].append((1 - 2 * oa) * (1 - 2 * ob))
 
-        correlations_raw: Dict[Tuple[float, float], float] = {}
+        correlations_raw: dict[tuple[float, float], float] = {}
         for k, products in corr_counts.items():
             correlations_raw[k] = float(np.mean(products))
 

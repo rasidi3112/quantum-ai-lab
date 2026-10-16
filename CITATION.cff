@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use Quantum AI Lab in your research or teaching, please cite it as below."
+title: "Quantum AI Lab: quantum algorithms, cryptography, machine learning and simulation from first principles"
+type: software
+authors:
+  - alias: rasidi3112
+version: 1.1.0
+license: MIT
+repository-code: "https://github.com/rasidi3112/quantum-ai-lab"
+keywords:
+  - quantum computing
+  - quantum machine learning
+  - QAOA
+  - quantum cryptography
+  - statevector simulation

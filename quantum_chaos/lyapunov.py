@@ -1,10 +1,26 @@
+"""Out-of-time-order correlators and quantum Lyapunov exponents.
+
+The OTOC ``C(t) = <[W(t), V]^dagger [W(t), V]>`` with
+``W(t) = exp(iHt) W exp(-iHt)`` measures how fast an initially local
+perturbation spreads (scrambles). In chaotic systems it grows as
+``C(t) ~ exp(2 lambda t)`` at early times, defining the quantum Lyapunov
+exponent ``lambda``, which is bounded by ``2 pi T`` (Maldacena–Shenker–Stanford).
+
+References
+----------
+Maldacena, J., Shenker, S. H. & Stanford, D. "A bound on chaos."
+JHEP 2016, 106 (2016).
+"""
+
+from __future__ import annotations
+
 import numpy as np
 from scipy.linalg import expm
-from scipy.optimize import curve_fit
-from typing import Optional
 
 
 class LyapunovEstimator:
+    """OTOC computation and Lyapunov-exponent fitting."""
+
     def __init__(self) -> None:
         pass
 
@@ -41,6 +57,22 @@ class LyapunovEstimator:
         V: np.ndarray,
         times: np.ndarray,
     ) -> np.ndarray:
+        """Infinite-temperature OTOC ``Tr([W(t), V]^dagger [W(t), V]) / D``.
+
+        Parameters
+        ----------
+        H : numpy.ndarray
+            Hermitian Hamiltonian of dimension ``D``.
+        W, V : numpy.ndarray
+            Operators whose commutator is tracked.
+        times : numpy.ndarray
+            Evaluation times.
+
+        Returns
+        -------
+        numpy.ndarray
+            ``C(t)`` at each time.
+        """
         N = H.shape[0]
 
         eigenvalues, eigenvectors = np.linalg.eigh(H)
@@ -66,8 +98,24 @@ class LyapunovEstimator:
         beta: float,
         times: np.ndarray,
     ) -> np.ndarray:
-        N = H.shape[0]
+        """Thermal OTOC ``Tr(rho_beta [W(t), V]^dagger [W(t), V])``.
 
+        Parameters
+        ----------
+        H : numpy.ndarray
+            Hermitian Hamiltonian.
+        W, V : numpy.ndarray
+            Operators whose commutator is tracked.
+        beta : float
+            Inverse temperature.
+        times : numpy.ndarray
+            Evaluation times.
+
+        Returns
+        -------
+        numpy.ndarray
+            ``C_beta(t)`` at each time.
+        """
         eigenvalues, eigenvectors = np.linalg.eigh(H)
 
         E_shifted = eigenvalues - np.min(eigenvalues)
@@ -95,9 +143,27 @@ class LyapunovEstimator:
     def estimate_lyapunov(
         times: np.ndarray,
         otoc_values: np.ndarray,
-        t_start: Optional[float] = None,
-        t_end: Optional[float] = None,
+        t_start: float | None = None,
+        t_end: float | None = None,
     ) -> dict:
+        """Fit ``C(t) = A exp(2 lambda t)`` on the early-growth window.
+
+        Parameters
+        ----------
+        times : numpy.ndarray
+            Evaluation times.
+        otoc_values : numpy.ndarray
+            OTOC values.
+        t_start, t_end : float, optional
+            Fit window; by default from where ``C`` exceeds 1% of its maximum to
+            where it first exceeds 50%.
+
+        Returns
+        -------
+        dict
+            ``lyapunov_exponent``, ``amplitude``, ``fit_times``, ``fit_values`` and
+            the fit's ``r_squared`` (in log space).
+        """
         mask = otoc_values > 0
         t_pos = times[mask]
         c_pos = otoc_values[mask]
@@ -163,13 +229,29 @@ class LyapunovEstimator:
     def scrambling_time(
         times: np.ndarray, otoc_values: np.ndarray, threshold: float = 0.5
     ) -> float:
+        """First time the OTOC reaches ``threshold`` times its maximum.
+
+        Parameters
+        ----------
+        times : numpy.ndarray
+            Evaluation times.
+        otoc_values : numpy.ndarray
+            OTOC values.
+        threshold : float, default 0.5
+            Fraction of the maximum.
+
+        Returns
+        -------
+        float
+            The scrambling time, or ``inf`` if never reached.
+        """
         c_max = np.max(otoc_values)
         target = threshold * c_max
 
         idx = np.where(otoc_values >= target)[0]
         if len(idx) > 0:
             return float(times[idx[0]])
-        return np.inf
+        return float(np.inf)
 
     def __repr__(self) -> str:
         return "LyapunovEstimator()"

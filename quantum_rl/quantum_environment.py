@@ -1,11 +1,41 @@
+"""Self-contained reinforcement-learning environments.
+
+Gym-style ``reset()`` / ``step(action)`` environments with no external
+dependencies: the classic CartPole balancing task and the FrozenLake grid
+world.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
 import numpy as np
-from typing import Tuple, Optional, Dict, Any
 
 
 class CartPoleEnv:
-    def __init__(self, max_steps: int = 200, seed: Optional[int] = None):
+    """Cart-pole balancing task with the classic Gym dynamics.
+
+    The agent pushes the cart left (0) or right (1) and receives +1 per step
+    until the pole tilts beyond 12 degrees, the cart leaves the track, or
+    ``max_steps`` is reached.
+
+    Parameters
+    ----------
+    max_steps : int, default 200
+        Episode length limit.
+    seed : int, optional
+        Seed for the initial state.
+
+    Attributes
+    ----------
+    obs_scale : numpy.ndarray
+        Typical magnitude of each observation component, useful for scaling
+        inputs to a quantum policy.
+    """
+
+    def __init__(self, max_steps: int = 200, seed: int | None = None) -> None:
         self.max_steps = max_steps
-        self._rng = np.random.default_rng(seed)
+        self.rng = np.random.default_rng(seed)
 
         self.gravity = 9.8
         self.mass_cart = 1.0
@@ -20,17 +50,39 @@ class CartPoleEnv:
 
         self.n_actions = 2
         self.obs_dim = 4
+        self.obs_scale = np.array([self.x_threshold, 2.0, self.theta_threshold, 2.0])
         self.name = "CartPole-v0"
 
-        self.state: Optional[np.ndarray] = None
+        self.state: np.ndarray | None = None
         self.steps: int = 0
 
     def reset(self) -> np.ndarray:
-        self.state = self._rng.uniform(-0.05, 0.05, size=4)
+        """Start a new episode.
+
+        Returns
+        -------
+        numpy.ndarray
+            Observation ``[x, x_dot, theta, theta_dot]``.
+        """
+        self.state = self.rng.uniform(-0.05, 0.05, size=4)
         self.steps = 0
         return self.state.copy()
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, dict[str, Any]]:
+        """Advance the simulation by one time step.
+
+        Parameters
+        ----------
+        action : {0, 1}
+            Push left or right.
+
+        Returns
+        -------
+        observation : numpy.ndarray
+        reward : float
+        done : bool
+        info : dict
+        """
         if self.state is None:
             raise RuntimeError("Call reset() before step()")
 
@@ -66,7 +118,7 @@ class CartPoleEnv:
             or self.steps >= self.max_steps
         )
 
-        reward = 1.0 if not done else 0.0
+        reward = 1.0
 
         info = {
             "steps": self.steps,
@@ -77,6 +129,7 @@ class CartPoleEnv:
         return self.state.copy(), reward, done, info
 
     def render_ascii(self) -> str:
+        """Return a text drawing of the cart and pole."""
         if self.state is None:
             return "Environment not initialized. Call reset()."
 
@@ -116,6 +169,20 @@ class CartPoleEnv:
 
 
 class FrozenLakeEnv:
+    """FrozenLake grid world: reach the goal without falling into a hole.
+
+    Parameters
+    ----------
+    is_slippery : bool, default True
+        With probability 2/3 the agent moves perpendicular to the chosen action.
+    max_steps : int, default 100
+        Episode length limit.
+    custom_map : list of str, optional
+        Map rows using ``S`` (start), ``F`` (frozen), ``H`` (hole) and ``G`` (goal).
+    seed : int, optional
+        Seed for slippery transitions.
+    """
+
     DEFAULT_MAP = [
         "SFFF",
         "FHFH",
@@ -130,12 +197,12 @@ class FrozenLakeEnv:
         self,
         is_slippery: bool = True,
         max_steps: int = 100,
-        custom_map: Optional[list] = None,
-        seed: Optional[int] = None,
-    ):
+        custom_map: list | None = None,
+        seed: int | None = None,
+    ) -> None:
         self.is_slippery = is_slippery
         self.max_steps = max_steps
-        self._rng = np.random.default_rng(seed)
+        self.rng = np.random.default_rng(seed)
 
         self.grid_map = custom_map if custom_map else self.DEFAULT_MAP
         self.nrow = len(self.grid_map)
@@ -155,19 +222,19 @@ class FrozenLakeEnv:
         if self.start_pos is None:
             self.start_pos = (0, 0)
 
-        self.agent_pos: Optional[Tuple[int, int]] = None
+        self.agent_pos: tuple[int, int] | None = None
         self.steps: int = 0
 
-    def _pos_to_state(self, pos: Tuple[int, int]) -> int:
+    def _pos_to_state(self, pos: tuple[int, int]) -> int:
         return pos[0] * self.ncol + pos[1]
 
-    def _state_to_pos(self, state: int) -> Tuple[int, int]:
+    def _state_to_pos(self, state: int) -> tuple[int, int]:
         return (state // self.ncol, state % self.ncol)
 
-    def _get_cell(self, pos: Tuple[int, int]) -> str:
+    def _get_cell(self, pos: tuple[int, int]) -> str:
         return self.grid_map[pos[0]][pos[1]]
 
-    def _move(self, pos: Tuple[int, int], action: int) -> Tuple[int, int]:
+    def _move(self, pos: tuple[int, int], action: int) -> tuple[int, int]:
         r, c = pos
         if action == 0:
             r = max(0, r - 1)
@@ -180,21 +247,45 @@ class FrozenLakeEnv:
         return (r, c)
 
     def reset(self) -> np.ndarray:
+        """Start a new episode.
+
+        Returns
+        -------
+        numpy.ndarray
+            One-hot encoding of the agent's cell.
+        """
         self.agent_pos = self.start_pos
         self.steps = 0
         return self._get_observation()
 
     def _get_observation(self) -> np.ndarray:
+        if self.agent_pos is None:
+            raise RuntimeError("Call reset() before reading observations")
         obs = np.zeros(self.n_states, dtype=np.float64)
         obs[self._pos_to_state(self.agent_pos)] = 1.0
         return obs
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, dict[str, Any]]:
+        """Move the agent.
+
+        Parameters
+        ----------
+        action : {0, 1, 2, 3}
+            Up, right, down or left.
+
+        Returns
+        -------
+        observation : numpy.ndarray
+        reward : float
+            1 on reaching the goal, else 0.
+        done : bool
+        info : dict
+        """
         if self.agent_pos is None:
             raise RuntimeError("Call reset() before step()")
 
         if self.is_slippery:
-            rand = self._rng.random()
+            rand = self.rng.random()
             if rand < 1 / 3:
                 actual_action = action
             elif rand < 2 / 3:
@@ -229,6 +320,7 @@ class FrozenLakeEnv:
         return self._get_observation(), reward, done, info
 
     def render_ascii(self) -> str:
+        """Return a text drawing of the grid and the agent."""
         if self.agent_pos is None:
             return "Environment not initialized. Call reset()."
 

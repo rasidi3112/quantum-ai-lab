@@ -41,10 +41,10 @@ CNOT = np.array([[1,0,0,0],[0,1,0,0],[0,0,0,1],[0,0,1,0]])
 ```
 
 ### 4. Modular Independence
-Each module is self-contained with its own:
-- `__init__.py` with clean exports
-- `README.md` with documentation
-- `examples/` with runnable demos
+Each module is a self-contained package with:
+- `__init__.py` exporting its public classes
+- `examples/` with a runnable demo (`python -m <module>.examples.<demo>` or `qailab demo <name>`)
+- a test file in `tests/` that checks results against known physics
 
 ## Module Dependency Graph
 
@@ -109,9 +109,17 @@ Classical Input → Encoding → Quantum Circuit → Measurement → Classical O
 
 ## Testing Strategy
 
-Each module can be verified independently:
+The test suite checks physics, not just code paths: exact ground-state energies,
+conserved quantities, Tsirelson's bound, Trotter error scaling, random-matrix
+statistics and parameter-shift gradients against finite differences.
+
 ```bash
-# Run all module examples
+pytest                      # full suite
+qailab tour                 # one-line smoke test of all eight modules
+```
+
+Every module demo can also be run directly:
+```bash
 python -m quantum_ml.examples.iris_classification
 python -m quantum_chaos.examples.chaos_visualization
 python -m quantum_crypto.examples.secure_channel_demo
@@ -119,5 +127,5 @@ python -m quantum_algorithms.examples.factoring_demo
 python -m quantum_simulation.examples.phase_transition_demo
 python -m quantum_optimization.examples.portfolio_optimization
 python -m quantum_rl.examples.cartpole_quantum
-python -m quantum_vision.examples.mnist_quantum
+python -m quantum_vision.examples.bars_and_stripes
 ```

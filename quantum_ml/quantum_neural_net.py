@@ -1,8 +1,45 @@
+"""Quantum neural network layer with exact gradients.
+
+A configurable encoding (angle or amplitude) is followed by layers of
+``RX``/``RY``/``RZ`` rotations and a CNOT ring. Gradients are computed with
+the parameter-shift rule
+``d<O>/d theta = (<O>(theta + pi/2) - <O>(theta - pi/2)) / 2``,
+which is exact for rotation gates and works on real hardware.
+
+References
+----------
+Mitarai, K. et al. "Quantum circuit learning." Phys. Rev. A 98, 032309 (2018).
+Schuld, M. et al. "Evaluating analytic gradients on quantum hardware."
+Phys. Rev. A 99, 032331 (2019).
+"""
+
+from __future__ import annotations
+
+import warnings
+from typing import Literal
+
 import numpy as np
-from typing import Optional, Literal
 
 
 class QuantumNeuralNetwork:
+    """Parameterized quantum circuit used as a neural-network layer.
+
+    Parameters
+    ----------
+    n_qubits : int, default 4
+        Number of qubits.
+    n_layers : int, default 2
+        Number of variational layers.
+    encoding : {"angle", "amplitude"}, default "angle"
+        How inputs are loaded into the circuit.
+    measurement : {"expval", "probs"}, default "expval"
+        Output ``<Z_q>`` per qubit, or all ``2^n`` basis probabilities.
+    seed : int, optional
+        Seed for the weight initialization.
+    random_state : int, optional
+        Deprecated alias of ``seed``.
+    """
+
     I = np.eye(2, dtype=complex)
     H = np.array([[1, 1], [1, -1]], dtype=complex) / np.sqrt(2)
     X = np.array([[0, 1], [1, 0]], dtype=complex)
@@ -15,14 +52,23 @@ class QuantumNeuralNetwork:
         n_layers: int = 2,
         encoding: Literal["amplitude", "angle"] = "angle",
         measurement: Literal["expval", "probs"] = "expval",
-        random_state: Optional[int] = None,
-    ):
+        seed: int | None = None,
+        *,
+        random_state: int | None = None,
+    ) -> None:
+        if random_state is not None:
+            warnings.warn(
+                "`random_state` is deprecated, use `seed` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            seed = random_state if seed is None else seed
         self.n_qubits = n_qubits
         self.n_layers = n_layers
         self.encoding = encoding
         self.measurement = measurement
         self.dim = 2 ** n_qubits
-        self.rng = np.random.RandomState(random_state)
+        self.rng = np.random.default_rng(seed)
 
         self.n_params = 3 * n_qubits * n_layers
         self.weights = self.rng.uniform(-np.pi, np.pi, self.n_params)
@@ -69,6 +115,18 @@ class QuantumNeuralNetwork:
 
 
     def amplitude_encoding(self, x: np.ndarray) -> np.ndarray:
+        """Load ``x`` into the amplitudes of the state.
+
+        Parameters
+        ----------
+        x : numpy.ndarray
+            Input; truncated or zero-padded to ``2^n`` entries and normalized.
+
+        Returns
+        -------
+        numpy.ndarray
+            Normalized state (``|0...0>`` if ``x`` is zero).
+        """
         state = np.zeros(self.dim, dtype=complex)
         n = min(len(x), self.dim)
         state[:n] = x[:n]
@@ -82,6 +140,18 @@ class QuantumNeuralNetwork:
         return state
 
     def angle_encoding(self, x: np.ndarray) -> np.ndarray:
+        """Load ``x`` as ``RY(x_q)`` rotations, one feature per qubit (cyclic).
+
+        Parameters
+        ----------
+        x : numpy.ndarray
+            Input features.
+
+        Returns
+        -------
+        numpy.ndarray
+            Normalized state.
+        """
         state = np.zeros(self.dim, dtype=complex)
         state[0] = 1.0
 
@@ -92,6 +162,7 @@ class QuantumNeuralNetwork:
         return state
 
     def encode(self, x: np.ndarray) -> np.ndarray:
+        """Encode ``x`` with the configured encoding."""
         if self.encoding == "amplitude":
             return self.amplitude_encoding(x)
         else:
@@ -132,8 +203,23 @@ class QuantumNeuralNetwork:
     def forward(
         self,
         x: np.ndarray,
-        weights: Optional[np.ndarray] = None,
+        weights: np.ndarray | None = None,
     ) -> np.ndarray:
+        """Evaluate the circuit.
+
+        Parameters
+        ----------
+        x : numpy.ndarray
+            Input features.
+        weights : numpy.ndarray, optional
+            Weights to use instead of :attr:`weights`.
+
+        Returns
+        -------
+        numpy.ndarray
+            ``<Z_q>`` for every qubit, or basis probabilities, depending on
+            ``measurement``.
+        """
         if weights is None:
             weights = self.weights
 
@@ -153,9 +239,25 @@ class QuantumNeuralNetwork:
     def gradient(
         self,
         x: np.ndarray,
-        weights: Optional[np.ndarray] = None,
+        weights: np.ndarray | None = None,
         shift: float = np.pi / 2,
     ) -> np.ndarray:
+        """Jacobian of the output with respect to the weights (parameter shift).
+
+        Parameters
+        ----------
+        x : numpy.ndarray
+            Input features.
+        weights : numpy.ndarray, optional
+            Weights to differentiate at; defaults to :attr:`weights`.
+        shift : float, default pi/2
+            Parameter shift; ``pi/2`` gives exact derivatives.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of shape ``(n_params, output_size)``.
+        """
         if weights is None:
             weights = self.weights.copy()
 

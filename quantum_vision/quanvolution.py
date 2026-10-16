@@ -1,20 +1,47 @@
+"""Quanvolutional filters.
+
+A small random or trainable circuit is slid over image patches like a
+convolution kernel; each patch is angle-encoded and every qubit's measured
+``P(0)`` becomes one output channel.
+
+References
+----------
+Henderson, M. et al. "Quanvolutional neural networks: powering image
+recognition with quantum circuits." Quantum Mach. Intell. 2, 2 (2020).
+"""
+
+from __future__ import annotations
+
 import numpy as np
-from typing import Optional, List, Tuple
 
 
 class Quanvolution:
+    """Quantum convolution over square image patches.
+
+    Parameters
+    ----------
+    n_qubits : int, default 4
+        Qubits per filter; ``patch_size**2`` should not exceed it.
+    n_layers : int, default 2
+        Variational layers per filter.
+    patch_size : int, default 2
+        Side length of the square patch.
+    seed : int, optional
+        Seed for random filters.
+    """
+
     def __init__(
         self,
         n_qubits: int = 4,
         n_layers: int = 2,
         patch_size: int = 2,
-        seed: Optional[int] = None,
-    ):
+        seed: int | None = None,
+    ) -> None:
         self.n_qubits = n_qubits
         self.n_layers = n_layers
         self.patch_size = patch_size
         self.dim = 2 ** n_qubits
-        self._rng = np.random.default_rng(seed)
+        self.rng = np.random.default_rng(seed)
 
         self._I = np.eye(2, dtype=np.complex128)
         self._X = np.array([[0, 1], [1, 0]], dtype=np.complex128)
@@ -42,7 +69,7 @@ class Quanvolution:
     def _apply_cnot(self, state: np.ndarray, control: int, target: int) -> np.ndarray:
         n = self.n_qubits
         psi = state.reshape([2] * n)
-        idx_1 = [slice(None)] * n
+        idx_1: list[slice | int] = [slice(None)] * n
         idx_1[control] = 1
 
         psi_1 = psi[tuple(idx_1)].copy()
@@ -54,7 +81,7 @@ class Quanvolution:
 
     def _z_expectation(self, state: np.ndarray, qubit: int) -> float:
         psi = state.reshape([2] * self.n_qubits)
-        idx_0 = [slice(None)] * self.n_qubits
+        idx_0: list[slice | int] = [slice(None)] * self.n_qubits
         idx_0[qubit] = 0
         p0 = np.sum(np.abs(psi[tuple(idx_0)]) ** 2)
         z_exp = 2 * p0 - 1
@@ -88,16 +115,43 @@ class Quanvolution:
 
     def random_quantum_filter(
         self,
-        n_qubits: Optional[int] = None,
-        n_layers: Optional[int] = None,
-        seed: Optional[int] = None,
+        n_qubits: int | None = None,
+        n_layers: int | None = None,
+        seed: int | None = None,
     ) -> np.ndarray:
+        """Draw random filter angles uniformly from ``[0, 2 pi)``.
+
+        Parameters
+        ----------
+        n_qubits, n_layers : int, optional
+            Override the instance settings.
+        seed : int, optional
+            Seed for this filter only.
+
+        Returns
+        -------
+        numpy.ndarray
+        """
         nq = n_qubits or self.n_qubits
         nl = n_layers or self.n_layers
-        rng = np.random.default_rng(seed) if seed is not None else self._rng
+        rng = np.random.default_rng(seed) if seed is not None else self.rng
         return rng.uniform(0, 2 * np.pi, size=nl * 2 * nq)
 
     def apply_filter(self, patch: np.ndarray, params: np.ndarray) -> np.ndarray:
+        """Run the filter circuit on one patch.
+
+        Parameters
+        ----------
+        patch : numpy.ndarray
+            Pixel values in ``[0, 1]``, encoded as ``RY(pi * p)``.
+        params : numpy.ndarray
+            Filter angles.
+
+        Returns
+        -------
+        numpy.ndarray
+            ``P(0)`` of each qubit, in ``[0, 1]``.
+        """
         pixels = patch.flatten()[:self.n_qubits]
         if len(pixels) < self.n_qubits:
             pixels = np.pad(pixels, (0, self.n_qubits - len(pixels)))
@@ -109,6 +163,22 @@ class Quanvolution:
         filter_params: np.ndarray,
         stride: int = 2,
     ) -> np.ndarray:
+        """Slide the filter over a 2-D image.
+
+        Parameters
+        ----------
+        image : numpy.ndarray
+            Grayscale image with values in ``[0, 1]``.
+        filter_params : numpy.ndarray
+            Filter angles.
+        stride : int, default 2
+            Step between patches.
+
+        Returns
+        -------
+        numpy.ndarray
+            Feature map of shape ``(H_out, W_out, n_qubits)``.
+        """
         H, W = image.shape
         ps = self.patch_size
 
@@ -128,20 +198,44 @@ class Quanvolution:
 
     def trainable_filter(
         self,
-        n_qubits: Optional[int] = None,
-        n_layers: Optional[int] = None,
+        n_qubits: int | None = None,
+        n_layers: int | None = None,
     ) -> np.ndarray:
+        """Draw small initial angles ``N(0, 0.1^2)`` for a trainable filter."""
         nq = n_qubits or self.n_qubits
         nl = n_layers or self.n_layers
-        return self._rng.normal(0, 0.1, size=nl * 2 * nq)
+        return self.rng.normal(0, 0.1, size=nl * 2 * nq)
 
     def multi_filter(
         self,
         image: np.ndarray,
         n_filters: int,
-        params_list: List[np.ndarray],
+        params_list: list[np.ndarray],
         stride: int = 2,
     ) -> np.ndarray:
+        """Apply several filters and stack their feature maps.
+
+        Parameters
+        ----------
+        image : numpy.ndarray
+            Grayscale image.
+        n_filters : int
+            Number of filters to apply.
+        params_list : list of numpy.ndarray
+            Angles of each filter.
+        stride : int, default 2
+            Step between patches.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of shape ``(H_out, W_out, n_filters * n_qubits)``.
+
+        Raises
+        ------
+        ValueError
+            If fewer than ``n_filters`` parameter sets are given.
+        """
         if len(params_list) < n_filters:
             raise ValueError(
                 f"Expected {n_filters} parameter sets, got {len(params_list)}"

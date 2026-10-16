@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quantum-ai-lab"
-version = "1.0.0"
-description = "A comprehensive quantum computing and AI research laboratory"
+version = "1.1.0"
+description = "Quantum algorithms, cryptography, machine learning, chaos, simulation, optimization, RL and vision — from first principles in pure NumPy/SciPy."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
-    {name = "Quantum AI Lab Team"},
+    {name = "rasidi3112"},
 ]
 keywords = [
     "quantum-computing",
@@ -21,6 +21,12 @@ keywords = [
     "quantum-optimization",
     "quantum-reinforcement-learning",
     "quantum-vision",
+    "qaoa",
+    "vqe",
+    "shor",
+    "grover",
+    "bb84",
+    "statevector-simulator",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -30,6 +36,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Physics",
 ]
@@ -53,20 +60,24 @@ dev = [
     "pytest-cov>=4.0",
     "black>=23.0",
     "ruff>=0.1.0",
-    "mypy>=1.0",
+    "mypy>=1.10",
 ]
 all = [
     "quantum-ai-lab[quantum,ml,dev]",
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/quantum-ai-lab"
-Repository = "https://github.com/your-org/quantum-ai-lab"
-Documentation = "https://github.com/your-org/quantum-ai-lab/tree/main/docs"
-Issues = "https://github.com/your-org/quantum-ai-lab/issues"
+Homepage = "https://github.com/rasidi3112/quantum-ai-lab"
+Repository = "https://github.com/rasidi3112/quantum-ai-lab"
+Documentation = "https://github.com/rasidi3112/quantum-ai-lab/tree/main/docs"
+Issues = "https://github.com/rasidi3112/quantum-ai-lab/issues"
+
+[project.scripts]
+qailab = "quantum_ai_lab.cli:main"
 
 [tool.setuptools.packages.find]
 include = [
+    "quantum_ai_lab*",
     "quantum_ml*",
     "quantum_chaos*",
     "quantum_crypto*",
@@ -86,17 +97,55 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "D", "UP"]
-ignore = ["D100", "D104"]
+select = ["E", "F", "W", "I", "B", "UP", "D", "ANN"]
+ignore = ["E501", "E741", "B905", "ANN401", "D105", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "ANN"]
+"scripts/**" = ["D", "ANN"]
+"**/examples/**" = ["D", "ANN"]
 
 [tool.mypy]
 python_version = "3.10"
-warn_return_any = true
+files = [
+    "quantum_ai_lab",
+    "quantum_algorithms",
+    "quantum_chaos",
+    "quantum_crypto",
+    "quantum_ml",
+    "quantum_optimization",
+    "quantum_rl",
+    "quantum_simulation",
+    "quantum_vision",
+]
+exclude = ["/examples/", "ular\\.py$"]
+ignore_missing_imports = true
+warn_return_any = false
 warn_unused_configs = true
-disallow_untyped_defs = false
+check_untyped_defs = true
+
+[tool.coverage.run]
+source = [
+    "quantum_ai_lab",
+    "quantum_algorithms",
+    "quantum_chaos",
+    "quantum_crypto",
+    "quantum_ml",
+    "quantum_optimization",
+    "quantum_rl",
+    "quantum_simulation",
+    "quantum_vision",
+]
+omit = ["*/examples/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "--tb=short"

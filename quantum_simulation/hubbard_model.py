@@ -1,11 +1,23 @@
-from __future__ import annotations
+"""One-dimensional Fermi–Hubbard model.
 
-from typing import List, Optional, Tuple
+``H = -t sum_(<ij>, s) (c_is^dagger c_js + h.c.) + U sum_i n_i,up n_i,down``
+
+Fermions are mapped to qubits with the Jordan–Wigner transformation,
+``c_j^dagger = (prod_(k<j) Z_k) (X_j - i Y_j) / 2``, using two modes per site
+(spin up and down, interleaved). The Hilbert space has dimension
+``4^n_sites``, so exact diagonalization is practical for a few sites.
+
+References
+----------
+Hubbard, J. "Electron correlations in narrow energy bands."
+Proc. R. Soc. Lond. A 276, 238 (1963).
+"""
+
+from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy import linalg as la
-
 
 _I2 = np.eye(2, dtype=np.complex128)
 _X  = np.array([[0, 1], [1, 0]], dtype=np.complex128)
@@ -14,9 +26,9 @@ _Z  = np.array([[1, 0], [0, -1]], dtype=np.complex128)
 
 
 def _kron_chain(*ops: NDArray[np.complex128]) -> NDArray[np.complex128]:
-    out = ops[0]
+    out: NDArray[np.complex128] = ops[0]
     for op in ops[1:]:
-        out = np.kron(out, op)
+        out = np.kron(out, op).astype(np.complex128, copy=False)
     return out
 
 
@@ -45,6 +57,25 @@ def _number_operator(site: int, n_modes: int) -> NDArray[np.complex128]:
 
 
 class HubbardModel:
+    """Fermi–Hubbard chain.
+
+    Parameters
+    ----------
+    n_sites : int
+        Number of lattice sites (at least 2).
+    t_hop : float, default 1.0
+        Hopping amplitude ``t``.
+    U : float, default 2.0
+        On-site interaction.
+    periodic : bool, default False
+        Periodic boundary conditions.
+
+    Raises
+    ------
+    ValueError
+        If ``n_sites < 2``.
+    """
+
     def __init__(
         self,
         n_sites: int,
@@ -60,7 +91,7 @@ class HubbardModel:
         self.periodic = periodic
         self.n_modes = 2 * n_sites
         self.dim = 2 ** self.n_modes
-        self._hamiltonian: Optional[NDArray[np.complex128]] = None
+        self._hamiltonian: NDArray[np.complex128] | None = None
 
     def _mode(self, site: int, spin: int) -> int:
         return site * 2 + spin
@@ -73,6 +104,24 @@ class HubbardModel:
         U: float,
         periodic: bool = False,
     ) -> NDArray[np.complex128]:
+        """Dense Hubbard Hamiltonian in the Jordan–Wigner qubit basis.
+
+        Parameters
+        ----------
+        n_sites : int
+            Number of sites.
+        t_hop : float
+            Hopping amplitude.
+        U : float
+            On-site interaction.
+        periodic : bool, default False
+            Periodic boundary conditions.
+
+        Returns
+        -------
+        numpy.ndarray
+            Matrix of shape ``(4^n, 4^n)`` covering all particle-number sectors.
+        """
         n_modes = 2 * n_sites
         dim = 2 ** n_modes
         H = np.zeros((dim, dim), dtype=np.complex128)
@@ -101,6 +150,7 @@ class HubbardModel:
 
     @property
     def hamiltonian(self) -> NDArray[np.complex128]:
+        """The Hamiltonian matrix, built on first access and cached."""
         if self._hamiltonian is None:
             self._hamiltonian = self.build_hamiltonian(
                 self.n_sites, self.t_hop, self.U, self.periodic
@@ -110,7 +160,19 @@ class HubbardModel:
     @staticmethod
     def ground_state_energy(
         H: NDArray[np.complex128],
-    ) -> Tuple[float, NDArray[np.complex128]]:
+    ) -> tuple[float, NDArray[np.complex128]]:
+        """Lowest eigenpair of a Hermitian matrix (over all particle numbers).
+
+        Parameters
+        ----------
+        H : numpy.ndarray
+            Hermitian matrix.
+
+        Returns
+        -------
+        energy : float
+        state : numpy.ndarray
+        """
         eigenvalues, eigenvectors = la.eigh(H)
         return float(eigenvalues[0]), eigenvectors[:, 0]
 
@@ -118,6 +180,17 @@ class HubbardModel:
         self,
         state: NDArray[np.complex128],
     ) -> NDArray[np.float64]:
+        """Total occupation ``<n_i,up + n_i,down>`` of every site.
+
+        Parameters
+        ----------
+        state : numpy.ndarray
+            Statevector.
+
+        Returns
+        -------
+        numpy.ndarray
+        """
         density = np.zeros(self.n_sites, dtype=np.float64)
         for site in range(self.n_sites):
             for spin in (0, 1):
@@ -129,6 +202,17 @@ class HubbardModel:
         self,
         state: NDArray[np.complex128],
     ) -> NDArray[np.float64]:
+        """Double occupancy ``<n_i,up n_i,down>`` of every site.
+
+        Parameters
+        ----------
+        state : numpy.ndarray
+            Statevector.
+
+        Returns
+        -------
+        numpy.ndarray
+        """
         docc = np.zeros(self.n_sites, dtype=np.float64)
         for site in range(self.n_sites):
             n_up   = _number_operator(self._mode(site, 0), self.n_modes)
@@ -144,6 +228,28 @@ class HubbardModel:
         site: int = 0,
         spin: int = 0,
     ) -> NDArray[np.float64]:
+        """Single-particle spectral function from the Lehmann representation.
+
+        ``A(omega)`` sums Lorentzian-broadened particle (``c^dagger``) and hole (``c``)
+        excitations of the ground state.
+
+        Parameters
+        ----------
+        H : numpy.ndarray
+            Hamiltonian.
+        omega_range : numpy.ndarray
+            Frequencies.
+        eta : float, default 0.1
+            Lorentzian broadening.
+        site : int, default 0
+            Site of the probed orbital.
+        spin : int, default 0
+            Spin of the probed orbital (0 = up, 1 = down).
+
+        Returns
+        -------
+        numpy.ndarray
+        """
         eigenvalues, eigenvectors = la.eigh(H)
         E0 = eigenvalues[0]
         psi0 = eigenvectors[:, 0]
@@ -166,7 +272,8 @@ class HubbardModel:
 
         return A
 
-    def get_ground_state(self) -> Tuple[float, NDArray[np.complex128]]:
+    def get_ground_state(self) -> tuple[float, NDArray[np.complex128]]:
+        """Ground-state energy and vector of this model (over all particle numbers)."""
         return self.ground_state_energy(self.hamiltonian)
 
     def __repr__(self) -> str:

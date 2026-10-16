@@ -1,10 +1,27 @@
+"""Random-matrix diagnostics of quantum chaos.
+
+Integrable systems show uncorrelated (Poisson) energy levels, whereas chaotic
+systems show level repulsion described by random-matrix theory: the
+Wigner–Dyson distributions (GOE, GUE). This module provides spacing
+distributions, the Brody interpolation, and the unfolding-free ratio
+statistic ``<r>`` (0.386 for Poisson, 0.531 for GOE).
+
+References
+----------
+Bohigas, O., Giannoni, M. J. & Schmit, C. Phys. Rev. Lett. 52, 1 (1984).
+Atas, Y. Y. et al. Phys. Rev. Lett. 110, 084101 (2013).
+"""
+
+from __future__ import annotations
+
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.special import gamma as gamma_func
-from typing import Optional
 
 
 class LevelSpacing:
+    """Level-spacing statistics and chaos diagnosis for a spectrum."""
+
     def __init__(self) -> None:
         pass
 
@@ -13,6 +30,21 @@ class LevelSpacing:
     def compute_spacings(
         eigenvalues: np.ndarray, unfold: bool = True
     ) -> np.ndarray:
+        """Nearest-neighbour spacings of a spectrum.
+
+        Parameters
+        ----------
+        eigenvalues : numpy.ndarray
+            Energy levels (sorted internally).
+        unfold : bool, default True
+            Unfold with a polynomial fit of the level staircase so that the mean
+            spacing is about 1.
+
+        Returns
+        -------
+        numpy.ndarray
+            Positive spacings.
+        """
         E = np.sort(np.real(eigenvalues))
         spacings = np.diff(E)
 
@@ -42,24 +74,54 @@ class LevelSpacing:
 
     @staticmethod
     def wigner_surmise(s: np.ndarray) -> np.ndarray:
+        """GOE Wigner surmise ``P(s) = (pi/2) s exp(-pi s^2 / 4)``."""
         return (np.pi / 2) * s * np.exp(-np.pi * s ** 2 / 4)
 
     @staticmethod
     def poisson_distribution(s: np.ndarray) -> np.ndarray:
+        """Poisson spacing distribution ``P(s) = exp(-s)``."""
         return np.exp(-s)
 
     @staticmethod
     def brody_distribution(s: np.ndarray, q: float) -> np.ndarray:
+        """Brody distribution interpolating Poisson (``q = 0``) and GOE (``q = 1``).
+
+        Parameters
+        ----------
+        s : numpy.ndarray
+            Spacings.
+        q : float
+            Brody parameter in ``[0, 1]``.
+
+        Returns
+        -------
+        numpy.ndarray
+            Normalized density ``P(s)``.
+        """
         a = gamma_func((q + 2) / (q + 1)) ** (1 + q)
         return (1 + q) * a * s ** q * np.exp(-a * s ** (1 + q))
 
     @staticmethod
     def gue_surmise(s: np.ndarray) -> np.ndarray:
+        """GUE Wigner surmise ``P(s) = (32/pi^2) s^2 exp(-4 s^2 / pi)``."""
         return (32 / np.pi ** 2) * s ** 2 * np.exp(-4 * s ** 2 / np.pi)
 
 
     @staticmethod
     def ratio_statistic(eigenvalues: np.ndarray) -> dict:
+        """Mean spacing ratio ``<r>``, which needs no unfolding.
+
+        Parameters
+        ----------
+        eigenvalues : numpy.ndarray
+            Energy levels.
+
+        Returns
+        -------
+        dict
+            ``r_values`` (per-level ``min(r, 1/r)``), ``r_mean`` and a ``diagnosis``
+            string (Poisson below 0.44, GOE above 0.50).
+        """
         E = np.sort(np.real(eigenvalues))
         spacings = np.diff(E)
 
@@ -89,6 +151,20 @@ class LevelSpacing:
 
     @staticmethod
     def fit_brody(spacings: np.ndarray) -> tuple[float, float]:
+        """Fit the Brody parameter to a spacing histogram.
+
+        Parameters
+        ----------
+        spacings : numpy.ndarray
+            Unfolded spacings.
+
+        Returns
+        -------
+        q : float
+            Best-fit Brody parameter (``nan`` if the fit fails).
+        q_err : float
+            One-sigma uncertainty.
+        """
         s_max = min(float(np.max(spacings)), 5.0)
         bins = np.linspace(0, s_max, 50)
         hist, bin_edges = np.histogram(spacings, bins=bins, density=True)
@@ -98,7 +174,7 @@ class LevelSpacing:
         s_fit = s_centers[mask]
         p_fit = hist[mask]
 
-        def brody_func(s, q):
+        def brody_func(s: np.ndarray, q: float) -> np.ndarray:
             a = gamma_func((q + 2) / (q + 1)) ** (1 + q)
             return (1 + q) * a * s ** q * np.exp(-a * s ** (1 + q))
 
@@ -113,6 +189,19 @@ class LevelSpacing:
 
 
     def analyze(self, hamiltonian: np.ndarray) -> dict:
+        """Diagonalize a Hamiltonian and diagnose its level statistics.
+
+        Parameters
+        ----------
+        hamiltonian : numpy.ndarray
+            Hermitian matrix.
+
+        Returns
+        -------
+        dict
+            Eigenvalues, unfolded spacings, mean spacing, Brody fit, ratio
+            statistic and an overall diagnosis.
+        """
         eigenvalues = np.linalg.eigvalsh(hamiltonian)
 
         spacings = self.compute_spacings(eigenvalues, unfold=True)
